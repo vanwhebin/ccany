@@ -48,6 +48,23 @@ type ConfigUpdateRequest struct {
 	Value string `json:"value" binding:"required"`
 }
 
+// BulkConfigUpdateRequest bulk configuration update request
+type BulkConfigUpdateRequest struct {
+	OpenAIAPIKey     string `json:"openai_api_key"`
+	ClaudeAPIKey     string `json:"claude_api_key"`
+	OpenAIBaseURL    string `json:"openai_base_url"`
+	ClaudeBaseURL    string `json:"claude_base_url"`
+	BigModel         string `json:"big_model"`
+	SmallModel       string `json:"small_model"`
+	MaxTokensLimit   int    `json:"max_tokens_limit"`
+	RequestTimeout   int    `json:"request_timeout"`
+	Host             string `json:"host"`
+	Port             int    `json:"port"`
+	LogLevel         string `json:"log_level"`
+	JWTSecret        string `json:"jwt_secret"`
+	EncryptAlgorithm string `json:"encrypt_algorithm"`
+}
+
 // GetAllConfigs gets all configurations - GET /admin/configs
 func (h *ConfigHandler) GetAllConfigs(c *gin.Context) {
 	h.logger.Info("Getting all configs")
@@ -117,6 +134,55 @@ func (h *ConfigHandler) GetAllConfigs(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"configs": configItems,
+	})
+}
+
+// GetConfigObject gets configuration as a single object - GET /admin/config
+func (h *ConfigHandler) GetConfigObject(c *gin.Context) {
+	h.logger.Info("Getting config object")
+
+	// Get configuration using config manager
+	cfg, err := h.configManager.GetConfig()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get config object")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": i18n.T(c, "errors.config_error"),
+		})
+		return
+	}
+
+	// Convert config struct to response format expected by frontend
+	configResponse := gin.H{
+		"openai_api_key":   cfg.OpenAIAPIKey,
+		"claude_api_key":   cfg.ClaudeAPIKey,
+		"openai_base_url":  cfg.OpenAIBaseURL,
+		"claude_base_url":  cfg.ClaudeBaseURL,
+		"big_model":        cfg.BigModel,
+		"small_model":      cfg.SmallModel,
+		"max_tokens_limit": cfg.MaxTokensLimit,
+		"request_timeout":  cfg.RequestTimeout,
+		"host":             cfg.Host,
+		"port":             cfg.Port,
+		"log_level":        cfg.LogLevel,
+		"temperature":      cfg.Temperature,
+		"stream_enabled":   cfg.StreamEnabled,
+	}
+
+	// Get additional configuration fields that might not be in the main Config struct
+	jwtSecret, _ := h.configManager.GetConfigValue("jwt_secret")
+	encryptAlgo, _ := h.configManager.GetConfigValue("encrypt_algorithm")
+
+	// Add these fields to response (but mask sensitive ones)
+	if jwtSecret != "" {
+		configResponse["jwt_secret"] = jwtSecret // Frontend needs this to display/edit
+	}
+	if encryptAlgo != "" {
+		configResponse["encrypt_algorithm"] = encryptAlgo
+	}
+
+	h.logger.Info("Returning config object")
+	c.JSON(http.StatusOK, gin.H{
+		"config": configResponse,
 	})
 }
 
@@ -203,6 +269,121 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Configuration updated successfully",
 		"key":     key,
+	})
+}
+
+// UpdateBulkConfig updates multiple configurations - PUT /admin/config
+func (h *ConfigHandler) UpdateBulkConfig(c *gin.Context) {
+	var req BulkConfigUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.WithError(err).Error("Invalid bulk config request format")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"openai_api_key":   req.OpenAIAPIKey != "",
+		"claude_api_key":   req.ClaudeAPIKey != "",
+		"openai_base_url":  req.OpenAIBaseURL,
+		"big_model":        req.BigModel,
+		"small_model":      req.SmallModel,
+		"max_tokens_limit": req.MaxTokensLimit,
+		"request_timeout":  req.RequestTimeout,
+		"host":             req.Host,
+		"port":             req.Port,
+		"log_level":        req.LogLevel,
+	}).Info("Updating bulk configuration with received data")
+
+	// Map of field names to their config keys and whether they're encrypted
+	configUpdates := map[string]struct {
+		key          string
+		value        string
+		encrypted    bool
+		shouldUpdate bool
+	}{
+		"openai_api_key":    {key: config.KeyOpenAIAPIKey, value: req.OpenAIAPIKey, encrypted: true, shouldUpdate: true},
+		"claude_api_key":    {key: config.KeyClaudeAPIKey, value: req.ClaudeAPIKey, encrypted: true, shouldUpdate: true},
+		"openai_base_url":   {key: config.KeyOpenAIBaseURL, value: req.OpenAIBaseURL, encrypted: false, shouldUpdate: true},
+		"claude_base_url":   {key: config.KeyClaudeBaseURL, value: req.ClaudeBaseURL, encrypted: false, shouldUpdate: true},
+		"big_model":         {key: config.KeyBigModel, value: req.BigModel, encrypted: false, shouldUpdate: req.BigModel != ""},
+		"small_model":       {key: config.KeySmallModel, value: req.SmallModel, encrypted: false, shouldUpdate: req.SmallModel != ""},
+		"max_tokens_limit":  {key: config.KeyMaxTokens, value: strconv.Itoa(req.MaxTokensLimit), encrypted: false, shouldUpdate: req.MaxTokensLimit > 0},
+		"request_timeout":   {key: config.KeyRequestTimeout, value: strconv.Itoa(req.RequestTimeout), encrypted: false, shouldUpdate: req.RequestTimeout > 0},
+		"host":              {key: config.KeyServerHost, value: req.Host, encrypted: false, shouldUpdate: req.Host != ""},
+		"port":              {key: config.KeyServerPort, value: strconv.Itoa(req.Port), encrypted: false, shouldUpdate: req.Port > 0},
+		"log_level":         {key: config.KeyLogLevel, value: req.LogLevel, encrypted: false, shouldUpdate: req.LogLevel != ""},
+		"jwt_secret":        {key: "jwt_secret", value: req.JWTSecret, encrypted: true, shouldUpdate: req.JWTSecret != ""},
+		"encrypt_algorithm": {key: "encrypt_algorithm", value: req.EncryptAlgorithm, encrypted: false, shouldUpdate: req.EncryptAlgorithm != ""},
+	}
+
+	// Validate all values first
+	for fieldName, update := range configUpdates {
+		if update.shouldUpdate && update.value != "" {
+			if err := h.validateConfigValue(update.key, update.value); err != nil {
+				h.logger.WithError(err).WithField("field", fieldName).Error("Validation failed for config field")
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf("Validation failed for %s: %s", fieldName, err.Error()),
+				})
+				return
+			}
+		}
+	}
+
+	// Update all configurations
+	updatedCount := 0
+	var updateErrors []string
+
+	for fieldName, update := range configUpdates {
+		if update.shouldUpdate {
+			h.logger.WithFields(logrus.Fields{
+				"field": fieldName,
+				"key":   update.key,
+				"value": func() string {
+					if update.encrypted && update.value != "" {
+						return "***masked***"
+					}
+					return update.value
+				}(),
+				"encrypted": update.encrypted,
+			}).Debug("Updating config field")
+
+			if err := h.configManager.UpdateConfig(update.key, update.value, update.encrypted); err != nil {
+				h.logger.WithError(err).WithField("field", fieldName).Error("Failed to update config field")
+				updateErrors = append(updateErrors, fmt.Sprintf("%s: %s", fieldName, err.Error()))
+			} else {
+				updatedCount++
+				h.logger.WithField("key", update.key).Debug("Configuration field updated successfully")
+			}
+		} else {
+			h.logger.WithField("field", fieldName).Debug("Skipping field update (empty or invalid value)")
+		}
+	}
+
+	if len(updateErrors) > 0 {
+		h.logger.WithField("errors", updateErrors).Error("Some configuration updates failed")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Some configuration updates failed",
+			"details": updateErrors,
+			"updated": updatedCount,
+			"failed":  len(updateErrors),
+		})
+		return
+	}
+
+	h.logger.WithField("updated_count", updatedCount).Info("Bulk configuration update completed successfully")
+
+	// Get updated configuration for response
+	cfg, err := h.configManager.GetConfig()
+	if err != nil {
+		h.logger.WithError(err).Warn("Failed to get updated config for response")
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Configuration updated successfully",
+		"updated": updatedCount,
+		"config":  cfg,
 	})
 }
 

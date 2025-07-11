@@ -60,8 +60,9 @@ go build -o ccany cmd/server/main.go
 ```bash
 # 启动服务器后，首次访问需要进行初始化设置
 # 访问 http://localhost:8082/setup 创建管理员账户并配置API密钥
-# 或者使用脚本初始化：
-go run scripts/init_admin.go
+# 或者使用部署脚本进行自动化部署：
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh start
 ```
 
 ### 5. 配置API密钥
@@ -186,6 +187,7 @@ ccany/
 │   ├── app/                     # 应用配置管理
 │   ├── auth/                    # 认证服务
 │   ├── cache/                   # 缓存服务
+│   ├── claudecode/              # Claude Code兼容性服务
 │   ├── client/                  # OpenAI客户端
 │   ├── config/                  # 配置管理
 │   ├── converter/               # 请求/响应转换器
@@ -202,7 +204,7 @@ ccany/
 ├── tests/
 │   └── basic_test.go           # 基础测试文件
 ├── scripts/
-│   └── init_admin.go           # 初始化管理员脚本
+│   └── deploy.sh                # 部署脚本
 ├── web/
 │   ├── index.html              # 主页面
 │   ├── setup.html              # 设置页面
@@ -310,13 +312,13 @@ go vet ./...
 - **可配置超时**: 可配置的超时和重试
 - **智能错误处理**: 详细的日志记录
 
-## 与Claude Code集成
+### 与Claude Code集成
 
-此代理设计为与Claude Code CLI无缝协作:
+此代理设计为与Claude Code CLI无缝协作。**增强版本包含完整的Claude Code兼容性支持**:
 
 ```bash
-# 启动代理
-go run cmd/server/main.go
+# 使用部署脚本启动增强版代理
+./scripts/deploy.sh start
 
 # 使用Claude Code与代理
 ANTHROPIC_BASE_URL=http://localhost:8082 claude
@@ -325,6 +327,75 @@ ANTHROPIC_BASE_URL=http://localhost:8082 claude
 export ANTHROPIC_BASE_URL=http://localhost:8082
 claude
 ```
+
+### 增强版Claude Code特性
+
+- ✅ **完整的SSE事件序列**: 支持 `message_start`, `content_block_start`, `ping`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop` 事件
+- ✅ **请求取消支持**: 客户端断开检测和优雅的请求取消
+- ✅ **Claude配置自动化**: 自动创建 `~/.claude.json` 配置文件
+- ✅ **Thinking模式**: 支持 `thinking` 字段和智能模型路由
+- ✅ **增强工具调用**: 支持增量JSON解析的工具调用流式传输
+- ✅ **缓存Token**: 支持 `cache_read_input_tokens` 使用报告
+- ✅ **智能路由**: 基于复杂度和token数量的智能模型选择
+
+### 部署选项
+
+```bash
+# 基本部署
+./scripts/deploy.sh start
+
+# 包含监控的部署
+./scripts/deploy.sh monitoring
+
+# 包含Nginx的部署
+./scripts/deploy.sh nginx
+
+# 测试Claude Code兼容性
+./scripts/deploy.sh test
+
+# 显示帮助
+./scripts/deploy.sh help
+```
+
+## Docker部署
+
+### 使用Docker Compose
+
+```bash
+# 复制环境配置
+cp .env.example .env
+# 编辑 .env 文件配置API密钥
+
+# 基本部署
+docker-compose up -d
+
+# 包含监控的部署
+docker-compose --profile monitoring up -d
+
+# 包含Nginx的部署
+docker-compose --profile nginx up -d
+
+# 测试Claude Code兼容性
+docker-compose --profile test up --build test-claude-code
+```
+
+### 使用部署脚本
+
+```bash
+# 自动化部署（推荐）
+./scripts/deploy.sh start
+
+# 包含监控栈的部署
+./scripts/deploy.sh monitoring
+
+# 检查服务状态
+./scripts/deploy.sh status
+
+# 查看日志
+./scripts/deploy.sh logs
+```
+
+详细的部署指南请参考：[部署文档](docs/DEPLOYMENT_GUIDE.md)
 
 ## 许可证
 
@@ -335,6 +406,19 @@ MIT License
 欢迎提交Issue和Pull Request！
 
 ## 更新日志
+
+### v1.3.0 (增强版 - Claude Code兼容性)
+- ✅ 完整的Claude Code兼容性支持
+- ✅ 增强的SSE事件序列 (message_start, content_block_start, ping, content_block_delta, content_block_stop, message_delta, message_stop)
+- ✅ 请求取消和客户端断开检测
+- ✅ Claude配置自动初始化 (~/.claude.json)
+- ✅ Thinking模式支持和智能模型路由
+- ✅ 增强的工具调用流式传输
+- ✅ 缓存Token使用报告
+- ✅ Docker和Docker Compose增强配置
+- ✅ GitHub Actions CI/CD流水线
+- ✅ 完整的部署脚本和监控支持
+- ✅ 增强的Nginx配置和性能优化
 
 ### v1.2.0
 - 完整的后台管理系统

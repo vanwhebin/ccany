@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Proxy - 首次设置</title>
+    <title>CCany - 首次设置</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
@@ -12,35 +12,35 @@
         .setup-container {
             background: var(--bg-primary);
             border-radius: var(--radius-2xl);
-            padding: var(--spacing-2xl);
+            padding: var(--space-8);
             max-width: 500px;
             width: 100%;
             box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--border-color);
         }
 
         .setup-header {
             text-align: center;
-            margin-bottom: var(--spacing-xl);
+            margin-bottom: var(--space-8);
         }
 
         .setup-header .logo {
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--space-6);
         }
 
         .setup-header .subtitle {
             color: var(--text-secondary);
             font-size: 16px;
-            margin-bottom: var(--spacing-md);
+            margin-bottom: var(--space-4);
         }
 
         .version-info {
-            margin-top: var(--spacing-md);
+            margin-top: var(--space-4);
             font-size: 12px;
             color: var(--text-tertiary);
             display: flex;
             justify-content: center;
-            gap: var(--spacing-md);
+            gap: var(--space-4);
         }
 
         .version-info span {
@@ -48,22 +48,22 @@
         }
 
         .setup-step {
-            margin-bottom: var(--spacing-xl);
+            margin-bottom: var(--space-8);
         }
 
         .step-title {
             font-size: 18px;
             color: var(--text-primary);
-            margin-bottom: var(--spacing-md);
+            margin-bottom: var(--space-4);
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: var(--space-3);
             font-weight: var(--font-weight-semibold);
         }
 
         .step-number {
-            background: var(--primary-color);
-            color: var(--text-white);
+            background: var(--claude-primary);
+            color: var(--text-inverse);
             width: 30px;
             height: 30px;
             border-radius: 50%;
@@ -75,28 +75,28 @@
         }
 
         .password-requirements {
-            margin-top: var(--spacing-xs);
+            margin-top: var(--space-2);
             font-size: 12px;
             color: var(--text-secondary);
         }
 
         .setup-button {
             width: 100%;
-            padding: var(--spacing-md) var(--spacing-lg);
-            background: var(--primary-color);
-            color: var(--text-white);
+            padding: var(--space-4) var(--space-6);
+            background: var(--claude-primary);
+            color: var(--text-inverse);
             border: none;
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-lg);
             font-size: 16px;
             font-weight: var(--font-weight-medium);
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
             outline: none;
-            margin-top: var(--spacing-xl);
+            margin-top: var(--space-8);
         }
 
         .setup-button:hover:not(:disabled) {
-            background: var(--primary-hover);
+            background: var(--claude-primary-hover);
             transform: translateY(-1px);
         }
 
@@ -106,9 +106,9 @@
         }
 
         .alert {
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-md);
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-4);
             font-size: 14px;
         }
 
@@ -127,12 +127,12 @@
         .loading {
             display: none;
             text-align: center;
-            margin-top: var(--spacing-lg);
+            margin-top: var(--space-6);
         }
 
         .spinner {
-            border: 3px solid var(--border-light);
-            border-top: 3px solid var(--primary-color);
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--claude-primary);
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -153,47 +153,47 @@
         .success-message {
             display: none;
             text-align: center;
-            margin-top: var(--spacing-lg);
+            margin-top: var(--space-6);
         }
 
         .success-message h3 {
             color: var(--success-color);
-            margin-bottom: var(--spacing-sm);
+            margin-bottom: var(--space-3);
             font-size: 18px;
             font-weight: var(--font-weight-semibold);
         }
 
         .success-message p {
             color: var(--text-secondary);
-            margin-bottom: var(--spacing-md);
+            margin-bottom: var(--space-4);
         }
 
         .continue-button {
             width: 100%;
-            padding: var(--spacing-md) var(--spacing-lg);
-            background: var(--primary-color);
-            color: var(--text-white);
+            padding: var(--space-4) var(--space-6);
+            background: var(--claude-primary);
+            color: var(--text-inverse);
             border: none;
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-lg);
             font-size: 16px;
             font-weight: var(--font-weight-medium);
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
             outline: none;
         }
 
         .continue-button:hover {
-            background: var(--primary-hover);
+            background: var(--claude-primary-hover);
             transform: translateY(-1px);
         }
 
         body {
-            background: linear-gradient(135deg, var(--primary-lighter) 0%, var(--primary-light) 100%);
+            background: linear-gradient(135deg, var(--claude-primary-lighter) 0%, var(--claude-primary-light) 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: var(--spacing-lg);
+            padding: var(--space-6);
         }
     </style>
 </head>
@@ -202,13 +202,13 @@
     <div class="setup-container">
         <div class="setup-header">
             <div class="logo">
-                <div class="logo-icon">🚀</div>
-                <h1>Claude Proxy</h1>
+                <div class="logo-icon">🤖</div>
+                <h1>CCany</h1>
             </div>
-            <p class="subtitle">欢迎使用 Claude Proxy！让我们完成首次设置</p>
+            <p class="subtitle" data-i18n="setup.welcome">欢迎使用 CCany！让我们完成首次设置</p>
             <div class="version-info">
-                <span>版本: <span id="appVersion">-</span></span>
-                <span>构建时间: <span id="buildTime">-</span></span>
+                <span data-i18n="setup.version">版本: <span id="appVersion">-</span></span>
+                <span data-i18n="setup.build_time">构建时间: <span id="buildTime">-</span></span>
             </div>
         </div>
 
@@ -216,46 +216,57 @@
             <div class="setup-step">
                 <div class="step-title">
                     <div class="step-number">1</div>
-                    创建管理员账户
+                    <span data-i18n="setup.create_admin">创建管理员账户</span>
                 </div>
 
                 <div id="alertContainer"></div>
 
                 <form id="adminSetupForm">
                     <div class="form-group">
-                        <label for="username">管理员用户名</label>
+                        <label for="username" data-i18n="setup.admin_username">管理员用户名</label>
                         <input type="text" id="username" name="username" required minlength="3" maxlength="50">
                     </div>
 
                     <div class="form-group">
-                        <label for="password">管理员密码</label>
+                        <label for="password" data-i18n="setup.admin_password">管理员密码</label>
                         <input type="password" id="password" name="password" required minlength="6">
-                        <div class="password-requirements">
+                        <div class="password-requirements" data-i18n="setup.password_requirements">
                             密码至少6个字符，建议包含大小写字母、数字和特殊字符
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="confirmPassword">确认密码</label>
+                        <label for="confirmPassword" data-i18n="setup.confirm_password">确认密码</label>
                         <input type="password" id="confirmPassword" name="confirmPassword" required>
                     </div>
 
-                    <button type="submit" class="setup-button">创建管理员账户</button>
+                    <button type="submit" class="setup-button" data-i18n="setup.create_account">创建管理员账户</button>
                 </form>
             </div>
 
             <div class="loading" id="loadingIndicator">
                 <div class="spinner"></div>
-                <p>正在创建管理员账户...</p>
+                <p data-i18n="setup.creating_account">正在创建管理员账户...</p>
             </div>
         </div>
 
         <div class="success-message" id="successMessage">
-            <h3>✅ 设置完成！</h3>
-            <p>管理员账户已创建成功。您现在可以登录到系统。</p>
-            <button class="continue-button" onclick="goToLogin()">前往登录</button>
+            <h3 data-i18n="setup.setup_complete">✅ 设置完成！</h3>
+            <p data-i18n="setup.account_created">管理员账户已创建成功。您现在可以登录到系统。</p>
+            <button class="continue-button" onclick="goToLogin()" data-i18n="setup.go_to_login">前往登录</button>
         </div>
     </div>
+
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" id="themeToggle" title="切换主题">
+        <svg class="theme-toggle-icon sun" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <svg class="theme-toggle-icon moon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
 
     <script>
         document.getElementById('adminSetupForm').addEventListener('submit', async function (e) {
@@ -391,9 +402,114 @@
 
         // 页面加载时检查设置状态
         window.addEventListener('load', function () {
+            initializeI18n(); // Initialize translations first
             checkSetupRequired();
             loadVersionInfo();
+            // Initialize theme controller for setup page
+            if (typeof ThemeController !== 'undefined') {
+                new ThemeController();
+            } else {
+                // Fallback theme controller for setup page
+                initializeThemeToggle();
+            }
         });
+
+        // Fallback theme controller for setup page
+        function initializeThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) return;
+
+            // Get current theme
+            let currentTheme = localStorage.getItem('theme') || 
+                               (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+            // Apply theme
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                updateToggleButton(theme);
+            }
+
+            // Update toggle button
+            function updateToggleButton(theme) {
+                const sunIcon = themeToggle.querySelector('.sun');
+                const moonIcon = themeToggle.querySelector('.moon');
+                
+                if (theme === 'dark') {
+                    themeToggle.title = '切换到明亮模式';
+                } else {
+                    themeToggle.title = '切换到暗黑模式';
+                }
+            }
+
+            // Toggle theme
+            function toggleTheme() {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                applyTheme(currentTheme);
+                
+                // Add click animation
+                themeToggle.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    themeToggle.style.transform = '';
+                }, 150);
+            }
+
+            // Initialize
+            applyTheme(currentTheme);
+            themeToggle.addEventListener('click', toggleTheme);
+        }
+
+        // Simple i18n for setup page
+        function initializeI18n() {
+            // Detect language
+            const currentLanguage = localStorage.getItem('preferred_language') || 
+                                   navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US';
+            
+            // Simple translation function
+            function t(key) {
+                const translations = {
+                    'zh-CN': {
+                        'setup.welcome': '欢迎使用 CCany！让我们完成首次设置',
+                        'setup.version': '版本:',
+                        'setup.build_time': '构建时间:',
+                        'setup.create_admin': '创建管理员账户',
+                        'setup.admin_username': '管理员用户名',
+                        'setup.admin_password': '管理员密码',
+                        'setup.confirm_password': '确认密码',
+                        'setup.password_requirements': '密码至少6个字符，建议包含大小写字母、数字和特殊字符',
+                        'setup.create_account': '创建管理员账户',
+                        'setup.creating_account': '正在创建管理员账户...',
+                        'setup.setup_complete': '✅ 设置完成！',
+                        'setup.account_created': '管理员账户已创建成功。您现在可以登录到系统。',
+                        'setup.go_to_login': '前往登录'
+                    },
+                    'en-US': {
+                        'setup.welcome': 'Welcome to CCany! Let\'s complete the initial setup',
+                        'setup.version': 'Version:',
+                        'setup.build_time': 'Build Time:',
+                        'setup.create_admin': 'Create Administrator Account',
+                        'setup.admin_username': 'Administrator Username',
+                        'setup.admin_password': 'Administrator Password',
+                        'setup.confirm_password': 'Confirm Password',
+                        'setup.password_requirements': 'Password must be at least 6 characters, recommend including uppercase letters, lowercase letters, numbers and special characters',
+                        'setup.create_account': 'Create Administrator Account',
+                        'setup.creating_account': 'Creating administrator account...',
+                        'setup.setup_complete': '✅ Setup Complete!',
+                        'setup.account_created': 'Administrator account has been created successfully. You can now log in to the system.',
+                        'setup.go_to_login': 'Go to Login'
+                    }
+                };
+                
+                return translations[currentLanguage]?.[key] || key;
+            }
+            
+            // Apply translations
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                const translation = t(key);
+                element.textContent = translation;
+            });
+        }
     </script>
 </body>
 

@@ -13,6 +13,7 @@ import (
 
 	"ccany/ent/user"
 	"ccany/internal/app"
+	"ccany/internal/claudecode"
 	"ccany/internal/client"
 	"ccany/internal/config"
 	"ccany/internal/database"
@@ -85,6 +86,18 @@ func main() {
 	logger.SetLevel(level)
 	logger.SetFormatter(&logrus.JSONFormatter{})
 
+	// Initialize Claude Code configuration
+	claudeConfigService := claudecode.NewConfigService(logger)
+	if err := claudeConfigService.InitializeConfig(); err != nil {
+		logger.WithError(err).Error("Failed to initialize Claude Code configuration")
+	} else {
+		logger.Info("Claude Code configuration initialized successfully")
+		// Increment startup count
+		if err := claudeConfigService.IncrementStartupCount(); err != nil {
+			logger.WithError(err).Warn("Failed to increment startup count")
+		}
+	}
+
 	// Print startup info
 	printStartupInfo(cfg, logger)
 
@@ -152,14 +165,19 @@ func main() {
 	}
 
 	// Create handlers
-	messagesHandler := handlers.NewMessagesHandler(cfg, openaiClient, requestLogger, logger)
-	healthHandler := handlers.NewHealthHandler(cfg, openaiClient, logger)
+	messagesHandler := handlers.NewEnhancedMessagesHandler(cfg, openaiClient, requestLogger, logger)
+	healthHandler := handlers.NewHealthHandler(cfg, configManager, logger)
 	configHandler := handlers.NewConfigHandler(configManager, logger)
 	usersHandler := handlers.NewUsersHandler(db, authMiddleware, logger)
 	setupHandler := handlers.NewSetupHandler(db, logger)
 	requestLogsHandler := handlers.NewRequestLogsHandler(requestLogger, logger)
 	monitoringHandler := handlers.NewMonitoringHandler(systemMonitor, logger)
 	i18nHandler := handlers.NewI18nHandler(i18nService, logger)
+
+	// Initialize Claude Code configuration for the enhanced handler
+	if err := messagesHandler.InitializeClaudeCodeConfig(); err != nil {
+		logger.WithError(err).Error("Failed to initialize Claude Code configuration in handler")
+	}
 
 	// Setup routes
 	setupRoutes(router, messagesHandler, healthHandler, configHandler, usersHandler, authMiddleware, setupHandler, requestLogsHandler, monitoringHandler, i18nHandler)
@@ -306,7 +324,7 @@ func printStartupInfo(cfg *config.Config, logger *logrus.Logger) {
 	fmt.Println()
 }
 
-func setupRoutes(router *gin.Engine, messagesHandler *handlers.MessagesHandler, healthHandler *handlers.HealthHandler, configHandler *handlers.ConfigHandler, usersHandler *handlers.UsersHandler, authMiddleware *middleware.AuthMiddleware, setupHandler *handlers.SetupHandler, requestLogsHandler *handlers.RequestLogsHandler, monitoringHandler *handlers.MonitoringHandler, i18nHandler *handlers.I18nHandler) {
+func setupRoutes(router *gin.Engine, messagesHandler *handlers.EnhancedMessagesHandler, healthHandler *handlers.HealthHandler, configHandler *handlers.ConfigHandler, usersHandler *handlers.UsersHandler, authMiddleware *middleware.AuthMiddleware, setupHandler *handlers.SetupHandler, requestLogsHandler *handlers.RequestLogsHandler, monitoringHandler *handlers.MonitoringHandler, i18nHandler *handlers.I18nHandler) {
 	// API routes
 	v1 := router.Group("/v1")
 	{
@@ -316,6 +334,9 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.MessagesHandler, 
 
 		// OpenAI API compatible routes
 		v1.POST("/chat/completions", messagesHandler.CreateChatCompletion)
+
+		// Claude Code specific routes
+		v1.GET("/models/capabilities", messagesHandler.GetModelCapabilities)
 	}
 
 	// Health and utility routes
@@ -365,7 +386,9 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.MessagesHandler, 
 		admin.DELETE("/users/:id", usersHandler.DeleteUser)
 
 		// Configuration management
-		admin.GET("/config", configHandler.GetAllConfigs)
+		admin.GET("/config", configHandler.GetConfigObject)
+		admin.PUT("/config", configHandler.UpdateBulkConfig)
+		admin.GET("/configs", configHandler.GetAllConfigs)
 		admin.GET("/config/:key", configHandler.GetConfig)
 		admin.PUT("/config/:key", configHandler.UpdateConfig)
 		admin.POST("/config/test", configHandler.TestConfig)

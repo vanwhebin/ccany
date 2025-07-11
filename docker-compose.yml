@@ -1,55 +1,102 @@
 version: '3.8'
 
 services:
-  # 主要应用服务
+  # Enhanced CCany application service with Claude Code support
   ccany:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ccany
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    container_name: ccany-enhanced
     ports:
       - "8082:8082"
     environment:
-      # OpenAI API配置
+      # OpenAI API Configuration
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - AZURE_API_VERSION=${AZURE_API_VERSION}
       
-      # 模型配置
+      # Claude API Configuration (for direct Claude support)
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - CLAUDE_BASE_URL=${CLAUDE_BASE_URL:-https://api.anthropic.com}
+      
+      # Enhanced Model Configuration
       - BIG_MODEL=${BIG_MODEL:-gpt-4o}
       - SMALL_MODEL=${SMALL_MODEL:-gpt-4o-mini}
+      - REASONING_MODEL=${REASONING_MODEL:-gpt-4o}
+      - LONG_CONTEXT_MODEL=${LONG_CONTEXT_MODEL:-gpt-4o}
       
-      # 服务器配置
+      # Server Configuration
       - HOST=0.0.0.0
       - PORT=8082
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       
-      # 性能配置
-      - MAX_TOKENS_LIMIT=${MAX_TOKENS_LIMIT:-4096}
-      - MIN_TOKENS_LIMIT=${MIN_TOKENS_LIMIT:-100}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-90}
-      - MAX_RETRIES=${MAX_RETRIES:-2}
+      # Enhanced Performance Configuration
+      - MAX_TOKENS_LIMIT=${MAX_TOKENS_LIMIT:-8192}
+      - MIN_TOKENS_LIMIT=${MIN_TOKENS_LIMIT:-1}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-120}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - TEMPERATURE=${TEMPERATURE:-0.7}
+      - STREAM_ENABLED=${STREAM_ENABLED:-true}
       
-      # 数据库配置
-      - DATABASE_URL=sqlite3:///app/data/proxy.db
+      # Database Configuration
+      - DATABASE_URL=sqlite3:///app/data/ccany.db
+      - DATABASE_ENCRYPTION_KEY=${DATABASE_ENCRYPTION_KEY:-}
       
-      # 安全配置
+      # Security Configuration
       - CLAUDE_PROXY_MASTER_KEY=${CLAUDE_PROXY_MASTER_KEY:-}
       - JWT_SECRET=${JWT_SECRET:-}
+      
+      # Claude Code Compatibility
+      - CLAUDE_CODE_COMPATIBLE=true
+      - CLAUDE_CONFIG_PATH=/home/appuser/.claude.json
+      
+      # Monitoring and Logging
+      - ENABLE_MONITORING=${ENABLE_MONITORING:-true}
+      - ENABLE_REQUEST_LOGGING=${ENABLE_REQUEST_LOGGING:-true}
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-30}
+      
     volumes:
       - ccany_data:/app/data
-      - ./logs:/app/logs
+      - ccany_logs:/app/logs
+      - claude_config:/home/appuser/.claude
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     networks:
       - ccany-network
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ccany.rule=Host(`ccany.local`)"
+      - "traefik.http.services.ccany.loadbalancer.server.port=8082"
 
-  # Nginx 反向代理 (可选 - 生产环境推荐)
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: ccany-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - ccany-network
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # Enhanced Nginx reverse proxy with Claude Code optimizations
   nginx:
     image: nginx:alpine
     container_name: ccany-nginx
@@ -59,6 +106,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - ccany
     networks:
@@ -66,11 +114,103 @@ services:
     profiles:
       - nginx
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=Host(`nginx.local`)"
+
+  # Prometheus for monitoring (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ccany-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - ccany-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ccany-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+    networks:
+      - ccany-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  # Test service for Claude Code compatibility
+  test-claude-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: ccany-test
+    volumes:
+      - ./tests:/app/tests
+    command: >
+      sh -c "
+        echo 'Running Claude Code compatibility tests...' &&
+        go test -v ./tests/ &&
+        echo 'Tests completed successfully!'
+      "
+    depends_on:
+      - ccany
+    networks:
+      - ccany-network
+    profiles:
+      - test
 
 volumes:
   ccany_data:
+    driver: local
+    labels:
+      - "ccany.volume.type=data"
+  ccany_logs:
+    driver: local
+    labels:
+      - "ccany.volume.type=logs"
+  claude_config:
+    driver: local
+    labels:
+      - "ccany.volume.type=config"
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:
   ccany-network:
     driver: bridge
+    labels:
+      - "ccany.network.type=main"

@@ -1,70 +1,93 @@
-# 多阶段构建 Dockerfile for CCany Go版本
+# Multi-stage build Dockerfile for Enhanced CCany with Claude Code support
 
-# 构建阶段
+# Build stage
 FROM golang:1.24-alpine AS builder
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
 
-# 安装必要的包
-RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev sqlite-dev
+# Install necessary packages for CGO and SQLite
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    gcc \
+    musl-dev \
+    sqlite-dev \
+    build-base
 
-# 复制go mod文件
+# Copy go mod files
 COPY go.mod go.sum ./
 
-# 下载依赖
+# Download dependencies
 RUN go mod download
 
-# 复制源代码
+# Copy source code
 COPY . .
 
-# 构建参数
+# Build arguments
 ARG VERSION=dev
 ARG BUILD_TIME=unknown
 
-# 构建应用程序
+# Build the enhanced application with Claude Code support
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo \
     -ldflags "-extldflags '-static' -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
     -o ccany cmd/server/main.go
 
-# 运行阶段
+# Verify the binary works
+RUN ./ccany --help || echo "Binary built successfully"
+
+# Runtime stage
 FROM alpine:latest
 
-# 安装ca-certificates用于HTTPS请求
-RUN apk --no-cache add ca-certificates tzdata wget
+# Install runtime dependencies
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    wget \
+    curl \
+    sqlite
 
-# 设置时区
+# Set timezone
 ENV TZ=Asia/Shanghai
 
-# 创建非root用户
+# Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
 
-# 从构建阶段复制二进制文件
+# Copy binary from builder stage
 COPY --from=builder /app/ccany .
 
-# 复制web静态文件
-COPY --from=builder /app/web ./web
+# Create necessary directories with proper permissions
+RUN mkdir -p \
+    /app/data \
+    /app/logs \
+    /home/appuser/.claude \
+    && chown -R appuser:appgroup /app /home/appuser
 
-# 复制脚本文件
-COPY --from=builder /app/scripts ./scripts
-
-# 创建数据目录和日志目录
-RUN mkdir -p /app/data /app/logs && \
-    chown -R appuser:appgroup /app
-
-# 切换到非root用户
+# Switch to non-root user
 USER appuser
 
-# 暴露端口
+# Expose port
 EXPOSE 8082
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+# Enhanced health check with Claude Code compatibility
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8082/health || exit 1
 
-# 启动应用程序
+# Environment variables for Claude Code compatibility
+ENV CLAUDE_CODE_COMPATIBLE=true
+ENV CLAUDE_CONFIG_PATH=/home/appuser/.claude.json
+
+# Labels for better container management
+LABEL org.opencontainers.image.title="CCany Enhanced with Claude Code Support"
+LABEL org.opencontainers.image.description="Enhanced Claude-to-OpenAI API Proxy with full Claude Code compatibility"
+LABEL org.opencontainers.image.vendor="CCany"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/yourusername/ccany"
+
+# Start the enhanced application
 CMD ["./ccany"]

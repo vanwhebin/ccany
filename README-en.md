@@ -60,8 +60,9 @@ go build -o ccany cmd/server/main.go
 ```bash
 # After starting the server, initial setup is required for first access
 # Visit http://localhost:8082/setup to create admin account and configure API keys
-# Or use the script to initialize:
-go run scripts/init_admin.go
+# Or use the deployment script for automated deployment:
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh start
 ```
 
 ### 5. Configure API Keys
@@ -186,6 +187,7 @@ ccany/
 │   ├── app/                     # Application configuration management
 │   ├── auth/                    # Authentication service
 │   ├── cache/                   # Cache service
+│   ├── claudecode/              # Claude Code compatibility services
 │   ├── client/                  # OpenAI client
 │   ├── config/                  # Configuration management
 │   ├── converter/               # Request/response converter
@@ -202,7 +204,7 @@ ccany/
 ├── tests/
 │   └── basic_test.go           # Basic test file
 ├── scripts/
-│   └── init_admin.go           # Admin initialization script
+│   └── deploy.sh                # Deployment script
 ├── web/
 │   ├── index.html              # Main page
 │   ├── setup.html              # Setup page
@@ -312,11 +314,11 @@ go vet ./...
 
 ## Integration with Claude Code
 
-This proxy is designed to work seamlessly with Claude Code CLI:
+This proxy is designed to work seamlessly with Claude Code CLI. **The enhanced version includes complete Claude Code compatibility support**:
 
 ```bash
-# Start the proxy
-go run cmd/server/main.go
+# Start the enhanced proxy using deployment script
+./scripts/deploy.sh start
 
 # Use Claude Code with the proxy
 ANTHROPIC_BASE_URL=http://localhost:8082 claude
@@ -325,6 +327,75 @@ ANTHROPIC_BASE_URL=http://localhost:8082 claude
 export ANTHROPIC_BASE_URL=http://localhost:8082
 claude
 ```
+
+### Enhanced Claude Code Features
+
+- ✅ **Complete SSE Event Sequence**: Support for `message_start`, `content_block_start`, `ping`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop` events
+- ✅ **Request Cancellation Support**: Client disconnect detection and graceful request cancellation
+- ✅ **Claude Configuration Automation**: Automatic creation of `~/.claude.json` configuration file
+- ✅ **Thinking Mode**: Support for `thinking` field and intelligent model routing
+- ✅ **Enhanced Tool Calls**: Tool call streaming with incremental JSON parsing
+- ✅ **Cache Tokens**: Support for `cache_read_input_tokens` usage reporting
+- ✅ **Smart Routing**: Intelligent model selection based on complexity and token count
+
+### Deployment Options
+
+```bash
+# Basic deployment
+./scripts/deploy.sh start
+
+# Deployment with monitoring
+./scripts/deploy.sh monitoring
+
+# Deployment with Nginx
+./scripts/deploy.sh nginx
+
+# Test Claude Code compatibility
+./scripts/deploy.sh test
+
+# Show help
+./scripts/deploy.sh help
+```
+
+## Docker Deployment
+
+### Using Docker Compose
+
+```bash
+# Copy environment configuration
+cp .env.example .env
+# Edit .env file to configure API keys
+
+# Basic deployment
+docker-compose up -d
+
+# Deployment with monitoring
+docker-compose --profile monitoring up -d
+
+# Deployment with Nginx
+docker-compose --profile nginx up -d
+
+# Test Claude Code compatibility
+docker-compose --profile test up --build test-claude-code
+```
+
+### Using Deployment Script
+
+```bash
+# Automated deployment (recommended)
+./scripts/deploy.sh start
+
+# Deployment with monitoring stack
+./scripts/deploy.sh monitoring
+
+# Check service status
+./scripts/deploy.sh status
+
+# View logs
+./scripts/deploy.sh logs
+```
+
+For detailed deployment guide, please refer to: [Deployment Documentation](docs/DEPLOYMENT_GUIDE.md)
 
 ## License
 
@@ -335,6 +406,19 @@ MIT License
 Issues and Pull Requests are welcome!
 
 ## Changelog
+
+### v1.3.0 (Enhanced - Claude Code Compatibility)
+- ✅ Complete Claude Code compatibility support
+- ✅ Enhanced SSE event sequence (message_start, content_block_start, ping, content_block_delta, content_block_stop, message_delta, message_stop)
+- ✅ Request cancellation and client disconnect detection
+- ✅ Claude configuration auto-initialization (~/.claude.json)
+- ✅ Thinking mode support and intelligent model routing
+- ✅ Enhanced tool call streaming
+- ✅ Cache token usage reporting
+- ✅ Enhanced Docker and Docker Compose configuration
+- ✅ GitHub Actions CI/CD pipeline
+- ✅ Complete deployment scripts and monitoring support
+- ✅ Enhanced Nginx configuration and performance optimization
 
 ### v1.2.0
 - Complete backend management system

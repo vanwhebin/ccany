@@ -1,0 +1,62 @@
+groups:
+  - name: ccany_alerts
+    rules:
+      # Application is down
+      - alert: CCanyDown
+        expr: up{job="ccany"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CCany application is down"
+          description: "CCany application has been down for more than 1 minute."
+
+      # High response time
+      - alert: CCanyHighResponseTime
+        expr: http_request_duration_seconds{job="ccany"} > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CCany high response time"
+          description: "CCany response time is greater than 5 seconds for more than 2 minutes."
+
+      # High error rate
+      - alert: CCanyHighErrorRate
+        expr: rate(http_requests_total{job="ccany",status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CCany high error rate"
+          description: "CCany error rate is greater than 10% for more than 5 minutes."
+
+      # Database connection issues
+      - alert: CCanyDatabaseIssues
+        expr: ccany_database_connections_failed_total > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CCany database connection issues"
+          description: "CCany is experiencing database connection failures."
+
+      # High memory usage
+      - alert: CCanyHighMemoryUsage
+        expr: process_resident_memory_bytes{job="ccany"} > 1000000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CCany high memory usage"
+          description: "CCany memory usage is greater than 1GB for more than 5 minutes."
+
+      # Redis is down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute."

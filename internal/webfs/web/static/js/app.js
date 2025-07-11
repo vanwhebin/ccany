@@ -1,5 +1,5 @@
-// Claude Code Proxy Backend Management Application
-console.log('JavaScript file loaded successfully');
+// Claude Code Proxy Backend Management Application - Enhanced with Claude UI
+console.log('Enhanced JavaScript file loaded successfully');
 
 // Test JavaScript execution by making a simple request
 fetch('/health').then(response => {
@@ -7,6 +7,428 @@ fetch('/health').then(response => {
 }).catch(error => {
     console.error('JavaScript test request failed:', error);
 });
+
+// Enhanced Theme Controller
+class ThemeController {
+    constructor() {
+        this.currentTheme = this.getStoredTheme() || this.getSystemTheme();
+        this.init();
+    }
+
+    init() {
+        this.applyTheme(this.currentTheme);
+        this.setupThemeToggle();
+        this.setupSystemThemeListener();
+    }
+
+    getStoredTheme() {
+        return localStorage.getItem('theme');
+    }
+
+    getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    setStoredTheme(theme) {
+        localStorage.setItem('theme', theme);
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        this.currentTheme = theme;
+        this.setStoredTheme(theme);
+        this.updateToggleButton();
+    }
+
+    toggleTheme() {
+        const newTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        this.applyTheme(newTheme);
+        
+        // Add smooth transition animation
+        document.body.style.transition = 'background 0.3s ease';
+        setTimeout(() => {
+            document.body.style.transition = '';
+        }, 300);
+    }
+
+    setupThemeToggle() {
+        const toggleButton = document.getElementById('themeToggle');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', () => {
+                this.toggleTheme();
+                // Add click animation
+                toggleButton.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    toggleButton.style.transform = '';
+                }, 150);
+            });
+        }
+    }
+
+    updateToggleButton() {
+        const toggleButton = document.getElementById('themeToggle');
+        if (toggleButton) {
+            const sunIcon = toggleButton.querySelector('.sun');
+            const moonIcon = toggleButton.querySelector('.moon');
+            
+            if (this.currentTheme === 'dark') {
+                toggleButton.title = '切换到明亮模式';
+                if (sunIcon) sunIcon.style.display = 'block';
+                if (moonIcon) moonIcon.style.display = 'none';
+            } else {
+                toggleButton.title = '切换到暗黑模式';
+                if (sunIcon) sunIcon.style.display = 'none';
+                if (moonIcon) moonIcon.style.display = 'block';
+            }
+        }
+    }
+
+    setupSystemThemeListener() {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', (e) => {
+            // Only auto-switch if user hasn't manually set a theme
+            if (!this.getStoredTheme()) {
+                this.applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    }
+}
+class UIAnimationController {
+    constructor() {
+        this.animationQueue = [];
+        this.isAnimating = false;
+        this.observers = new Map();
+        this.init();
+    }
+
+    init() {
+        this.setupIntersectionObserver();
+        this.setupScrollAnimations();
+        this.setupHoverEffects();
+        this.setupClickAnimations();
+    }
+
+    setupIntersectionObserver() {
+        const options = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const callback = (entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    this.animateElementIn(entry.target);
+                }
+            });
+        };
+
+        this.observer = new IntersectionObserver(callback, options);
+        
+        // Observe elements that should animate on scroll
+        document.querySelectorAll('.card, .stat-card, .table-container, .page-header').forEach(el => {
+            this.observer.observe(el);
+        });
+    }
+
+    animateElementIn(element) {
+        // Determine animation type based on element type
+        if (element.classList.contains('stat-card')) {
+            element.classList.add('animate-slide-in-bottom');
+        } else if (element.classList.contains('card')) {
+            element.classList.add('animate-fade-in');
+        } else if (element.classList.contains('table-container')) {
+            element.classList.add('animate-slide-in-bottom');
+        } else if (element.classList.contains('page-header')) {
+            element.classList.add('animate-slide-in-top');
+        }
+
+        // Add stagger effect for multiple elements
+        const siblings = Array.from(element.parentNode.children).filter(child => 
+            child.classList.contains(element.classList[0])
+        );
+        const index = siblings.indexOf(element);
+        element.style.animationDelay = `${index * 0.1}s`;
+    }
+
+    setupScrollAnimations() {
+        let ticking = false;
+
+        const updateScrollEffects = () => {
+            const scrolled = window.pageYOffset;
+            const rate = scrolled * -0.5;
+            
+            // Parallax effect for login background
+            const loginContainer = document.querySelector('.login-container');
+            if (loginContainer) {
+                loginContainer.style.transform = `translateY(${rate}px)`;
+            }
+
+            ticking = false;
+        };
+
+        const requestTick = () => {
+            if (!ticking) {
+                requestAnimationFrame(updateScrollEffects);
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', requestTick, { passive: true });
+    }
+
+    setupHoverEffects() {
+        // Enhanced button hover effects
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.classList.contains('btn')) {
+                this.addHoverGlow(e.target);
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            if (e.target.classList.contains('btn')) {
+                this.removeHoverGlow(e.target);
+            }
+        });
+    }
+
+    addHoverGlow(element) {
+        if (!element.querySelector('.hover-glow')) {
+            const glow = document.createElement('div');
+            glow.className = 'hover-glow';
+            glow.style.cssText = `
+                position: absolute;
+                top: -2px;
+                left: -2px;
+                right: -2px;
+                bottom: -2px;
+                background: linear-gradient(45deg, var(--claude-orange), var(--claude-blue));
+                border-radius: inherit;
+                z-index: -1;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                pointer-events: none;
+            `;
+            element.style.position = 'relative';
+            element.appendChild(glow);
+            
+            // Animate glow in
+            setTimeout(() => {
+                glow.style.opacity = '0.3';
+            }, 10);
+        }
+    }
+
+    removeHoverGlow(element) {
+        const glow = element.querySelector('.hover-glow');
+        if (glow) {
+            glow.style.opacity = '0';
+            setTimeout(() => {
+                if (glow.parentNode) {
+                    glow.parentNode.removeChild(glow);
+                }
+            }, 300);
+        }
+    }
+
+    setupClickAnimations() {
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn') || e.target.classList.contains('menu-item')) {
+                this.createRippleEffect(e.target, e);
+            }
+        });
+    }
+
+    createRippleEffect(element, event) {
+        const ripple = document.createElement('div');
+        const rect = element.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = event.clientX - rect.left - size / 2;
+        const y = event.clientY - rect.top - size / 2;
+        
+        ripple.style.cssText = `
+            position: absolute;
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x}px;
+            top: ${y}px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple-animation 0.6s ease-out;
+            pointer-events: none;
+        `;
+        
+        element.style.position = 'relative';
+        element.style.overflow = 'hidden';
+        element.appendChild(ripple);
+        
+        // Add CSS animation if not already present
+        if (!document.querySelector('#ripple-animation-styles')) {
+            const style = document.createElement('style');
+            style.id = 'ripple-animation-styles';
+            style.textContent = `
+                @keyframes ripple-animation {
+                    to {
+                        transform: scale(2);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        setTimeout(() => {
+            if (ripple.parentNode) {
+                ripple.parentNode.removeChild(ripple);
+            }
+        }, 600);
+    }
+
+    // Enhanced loading animations
+    showLoadingState(element, text = 'Loading...') {
+        if (element.dataset.originalContent) return; // Already in loading state
+        
+        element.dataset.originalContent = element.innerHTML;
+        element.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <span>${text}</span>
+            </div>
+        `;
+        element.classList.add('btn-loading');
+        element.disabled = true;
+    }
+
+    hideLoadingState(element) {
+        if (element.dataset.originalContent) {
+            element.innerHTML = element.dataset.originalContent;
+            delete element.dataset.originalContent;
+            element.classList.remove('btn-loading');
+            element.disabled = false;
+        }
+    }
+
+    // Smooth transitions between states
+    transitionToState(element, newState, duration = 300) {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(10px)';
+        
+        setTimeout(() => {
+            element.className = newState;
+            element.style.opacity = '1';
+            element.style.transform = 'translateY(0)';
+        }, duration / 2);
+    }
+
+    // Enhanced notification system
+    showEnhancedNotification(message, type = 'info', duration = 4000) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icon = this.getNotificationIcon(type);
+        notification.innerHTML = `
+            <div class="notification-icon">${icon}</div>
+            <div class="notification-content">
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close">×</button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+        
+        // Close button functionality
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
+            this.hideNotification(notification);
+        });
+        
+        // Auto-hide
+        setTimeout(() => {
+            this.hideNotification(notification);
+        }, duration);
+    }
+
+    getNotificationIcon(type) {
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        return icons[type] || icons.info;
+    }
+
+    hideNotification(notification) {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }
+
+    // Performance optimized counter animations
+    animateCounter(element, start, end, duration = 1000) {
+        const range = end - start;
+        const increment = end > start ? 1 : -1;
+        const stepTime = Math.abs(Math.floor(duration / range));
+        let current = start;
+        
+        const timer = setInterval(() => {
+            current += increment;
+            element.textContent = current;
+            
+            if (current === end) {
+                clearInterval(timer);
+            }
+        }, stepTime);
+    }
+
+    // Enhanced form validation with animations
+    validateFormField(field, isValid) {
+        const parent = field.closest('.form-group');
+        if (!parent) return;
+        
+        parent.classList.remove('field-valid', 'field-invalid');
+        
+        if (isValid) {
+            parent.classList.add('field-valid');
+            this.showFieldSuccess(field);
+        } else {
+            parent.classList.add('field-invalid');
+            this.showFieldError(field);
+        }
+    }
+
+    showFieldSuccess(field) {
+        field.style.borderColor = 'var(--success-color)';
+        field.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+    }
+
+    showFieldError(field) {
+        field.style.borderColor = 'var(--error-color)';
+        field.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+        field.classList.add('animate-shake');
+        
+        setTimeout(() => {
+            field.classList.remove('animate-shake');
+        }, 500);
+    }
+
+    // Cleanup method
+    destroy() {
+        if (this.observer) {
+            this.observer.disconnect();
+        }
+        this.observers.clear();
+    }
+}
 
 class ClaudeProxyApp {
     constructor() {
@@ -17,6 +439,14 @@ class ClaudeProxyApp {
         this.isAuthenticated = false;
         this.currentLanguage = 'zh-CN';
         this.translations = {};
+        this.uiController = new UIAnimationController();
+        this.themeController = new ThemeController();
+        this.debounceTimers = new Map();
+        this.performanceMetrics = {
+            startTime: Date.now(),
+            apiCalls: 0,
+            errors: 0
+        };
         // Don't call init() here, it will be called from DOMContentLoaded
     }
 
@@ -147,6 +577,7 @@ class ClaudeProxyApp {
                 'logging_in': this.currentLanguage === 'zh-CN' ? '登录中...' : 'Logging in...',
                 'logout': this.currentLanguage === 'zh-CN' ? '退出' : 'Logout',
                 'login_error': this.currentLanguage === 'zh-CN' ? '登录失败' : 'Login failed',
+                'login_success': this.currentLanguage === 'zh-CN' ? '登录成功' : 'Login successful',
                 'network_error': this.currentLanguage === 'zh-CN' ? '网络错误，请重试' : 'Network error, please try again'
             },
             'menu': {
@@ -156,10 +587,174 @@ class ClaudeProxyApp {
                 'users': this.currentLanguage === 'zh-CN' ? '用户管理' : 'User Management',
                 'test': this.currentLanguage === 'zh-CN' ? 'API测试' : 'API Testing'
             },
+            'dashboard': {
+                'title': this.currentLanguage === 'zh-CN' ? '仪表板' : 'Dashboard',
+                'subtitle': this.currentLanguage === 'zh-CN' ? 'Claude Code Proxy 运行状态概览' : 'Claude Code Proxy Status Overview',
+                'total_requests': this.currentLanguage === 'zh-CN' ? '总请求数' : 'Total Requests',
+                'avg_response_time': this.currentLanguage === 'zh-CN' ? '平均响应时间' : 'Average Response Time',
+                'success_rate': this.currentLanguage === 'zh-CN' ? '成功率' : 'Success Rate',
+                'tokens_used': this.currentLanguage === 'zh-CN' ? 'Token使用量' : 'Tokens Used',
+                'system_info': this.currentLanguage === 'zh-CN' ? '系统信息' : 'System Information',
+                'version': this.currentLanguage === 'zh-CN' ? '版本' : 'Version',
+                'uptime': this.currentLanguage === 'zh-CN' ? '运行时间' : 'Uptime',
+                'current_model': this.currentLanguage === 'zh-CN' ? '当前模型' : 'Current Model',
+                'recent_requests': this.currentLanguage === 'zh-CN' ? '最近请求' : 'Recent Requests',
+                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
+                'service_normal': this.currentLanguage === 'zh-CN' ? '服务正常' : 'Service Normal',
+                'service_error': this.currentLanguage === 'zh-CN' ? '服务异常' : 'Service Error',
+                'connection_failed': this.currentLanguage === 'zh-CN' ? '连接失败' : 'Connection Failed'
+            },
+            'requests': {
+                'title': this.currentLanguage === 'zh-CN' ? '请求日志' : 'Request Logs',
+                'subtitle': this.currentLanguage === 'zh-CN' ? '查看所有API请求的详细记录' : 'View detailed records of all API requests',
+                'search_placeholder': this.currentLanguage === 'zh-CN' ? '搜索请求...' : 'Search requests...',
+                'refresh': this.currentLanguage === 'zh-CN' ? '刷新' : 'Refresh',
+                'time': this.currentLanguage === 'zh-CN' ? '时间' : 'Time',
+                'model': this.currentLanguage === 'zh-CN' ? '模型' : 'Model',
+                'status': this.currentLanguage === 'zh-CN' ? '状态' : 'Status',
+                'response_time': this.currentLanguage === 'zh-CN' ? '响应时间' : 'Response Time',
+                'token': this.currentLanguage === 'zh-CN' ? 'Token' : 'Token',
+                'actions': this.currentLanguage === 'zh-CN' ? '操作' : 'Actions',
+                'details': this.currentLanguage === 'zh-CN' ? '详情' : 'Details',
+                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
+                'success': this.currentLanguage === 'zh-CN' ? '成功' : 'Success',
+                'failed': this.currentLanguage === 'zh-CN' ? '失败' : 'Failed',
+                'warning': this.currentLanguage === 'zh-CN' ? '警告' : 'Warning'
+            },
+            'config': {
+                'title': this.currentLanguage === 'zh-CN' ? '配置管理' : 'Configuration',
+                'subtitle': this.currentLanguage === 'zh-CN' ? '管理代理服务器的配置参数' : 'Manage proxy server configuration parameters',
+                'api_config': this.currentLanguage === 'zh-CN' ? 'API配置' : 'API Configuration',
+                'openai_api_key': this.currentLanguage === 'zh-CN' ? 'OpenAI API Key' : 'OpenAI API Key',
+                'claude_api_key': this.currentLanguage === 'zh-CN' ? 'Claude API Key' : 'Claude API Key',
+                'openai_base_url': this.currentLanguage === 'zh-CN' ? 'OpenAI Base URL' : 'OpenAI Base URL',
+                'claude_base_url': this.currentLanguage === 'zh-CN' ? 'Claude Base URL' : 'Claude Base URL',
+                'openai_api_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入OpenAI API Key' : 'Enter OpenAI API Key',
+                'claude_api_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入Claude API Key' : 'Enter Claude API Key',
+                'openai_base_url_placeholder': this.currentLanguage === 'zh-CN' ? 'https://api.openai.com/v1' : 'https://api.openai.com/v1',
+                'claude_base_url_placeholder': this.currentLanguage === 'zh-CN' ? 'https://api.anthropic.com' : 'https://api.anthropic.com',
+                'test_api_key': this.currentLanguage === 'zh-CN' ? '🔍 测试API密钥' : '🔍 Test API Keys',
+                'model_config': this.currentLanguage === 'zh-CN' ? '模型配置' : 'Model Configuration',
+                'big_model': this.currentLanguage === 'zh-CN' ? '大模型 (Sonnet/Opus)' : 'Large Model (Sonnet/Opus)',
+                'small_model': this.currentLanguage === 'zh-CN' ? '小模型 (Haiku)' : 'Small Model (Haiku)',
+                'big_model_placeholder': this.currentLanguage === 'zh-CN' ? 'claude-3-5-sonnet-20241022' : 'claude-3-5-sonnet-20241022',
+                'small_model_placeholder': this.currentLanguage === 'zh-CN' ? 'claude-3-haiku-20240307' : 'claude-3-haiku-20240307',
+                'max_tokens': this.currentLanguage === 'zh-CN' ? '最大Token限制' : 'Max Tokens Limit',
+                'max_tokens_placeholder': this.currentLanguage === 'zh-CN' ? '4096' : '4096',
+                'request_timeout': this.currentLanguage === 'zh-CN' ? '请求超时 (秒)' : 'Request Timeout (seconds)',
+                'request_timeout_placeholder': this.currentLanguage === 'zh-CN' ? '90' : '90',
+                'server_config': this.currentLanguage === 'zh-CN' ? '服务器配置' : 'Server Configuration',
+                'server_host': this.currentLanguage === 'zh-CN' ? '服务器地址' : 'Server Host',
+                'server_port': this.currentLanguage === 'zh-CN' ? '服务器端口' : 'Server Port',
+                'server_host_placeholder': this.currentLanguage === 'zh-CN' ? '0.0.0.0' : '0.0.0.0',
+                'server_port_placeholder': this.currentLanguage === 'zh-CN' ? '8080' : '8080',
+                'log_level': this.currentLanguage === 'zh-CN' ? '日志级别' : 'Log Level',
+                'stream_enabled': this.currentLanguage === 'zh-CN' ? '启用流式响应' : 'Enable Streaming Response',
+                'security_config': this.currentLanguage === 'zh-CN' ? '安全配置' : 'Security Configuration',
+                'jwt_secret': this.currentLanguage === 'zh-CN' ? 'JWT密钥' : 'JWT Secret',
+                'db_encrypt_key': this.currentLanguage === 'zh-CN' ? '数据库加密密钥' : 'Database Encryption Key',
+                'jwt_secret_placeholder': this.currentLanguage === 'zh-CN' ? '输入JWT密钥' : 'Enter JWT Secret',
+                'db_encrypt_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入数据库加密密钥' : 'Enter Database Encryption Key',
+                'encrypt_algo': this.currentLanguage === 'zh-CN' ? '配置加密算法' : 'Configuration Encryption Algorithm',
+                'test_config': this.currentLanguage === 'zh-CN' ? '测试配置' : 'Test Configuration',
+                'save_config': this.currentLanguage === 'zh-CN' ? '保存配置' : 'Save Configuration',
+                'saving': this.currentLanguage === 'zh-CN' ? '保存中...' : 'Saving...',
+                'config_saved': this.currentLanguage === 'zh-CN' ? '配置已保存' : 'Configuration Saved',
+                'save_failed': this.currentLanguage === 'zh-CN' ? '保存失败' : 'Save Failed',
+                'testing': this.currentLanguage === 'zh-CN' ? '测试中...' : 'Testing...',
+                'testing_config': this.currentLanguage === 'zh-CN' ? '正在测试配置...' : 'Testing configuration...',
+                'config_test_success': this.currentLanguage === 'zh-CN' ? '配置测试成功' : 'Configuration Test Successful',
+                'config_test_failed': this.currentLanguage === 'zh-CN' ? '配置测试失败' : 'Configuration Test Failed',
+                'testing_api_key': this.currentLanguage === 'zh-CN' ? '正在测试API密钥...' : 'Testing API keys...',
+                'api_key_test_success': this.currentLanguage === 'zh-CN' ? 'API密钥测试成功' : 'API Key Test Successful',
+                'api_key_test_failed': this.currentLanguage === 'zh-CN' ? 'API密钥测试失败' : 'API Key Test Failed',
+                'network_error': this.currentLanguage === 'zh-CN' ? '网络错误' : 'Network Error'
+            },
+            'users': {
+                'title': this.currentLanguage === 'zh-CN' ? '用户管理' : 'User Management',
+                'subtitle': this.currentLanguage === 'zh-CN' ? '管理系统用户和权限' : 'Manage system users and permissions',
+                'search_placeholder': this.currentLanguage === 'zh-CN' ? '搜索用户...' : 'Search users...',
+                'add_user': this.currentLanguage === 'zh-CN' ? '添加用户' : 'Add User',
+                'username': this.currentLanguage === 'zh-CN' ? '用户名' : 'Username',
+                'email': this.currentLanguage === 'zh-CN' ? '邮箱' : 'Email',
+                'password': this.currentLanguage === 'zh-CN' ? '密码' : 'Password',
+                'role': this.currentLanguage === 'zh-CN' ? '角色' : 'Role',
+                'status': this.currentLanguage === 'zh-CN' ? '状态' : 'Status',
+                'last_login': this.currentLanguage === 'zh-CN' ? '最后登录' : 'Last Login',
+                'actions': this.currentLanguage === 'zh-CN' ? '操作' : 'Actions',
+                'edit': this.currentLanguage === 'zh-CN' ? '编辑' : 'Edit',
+                'delete': this.currentLanguage === 'zh-CN' ? '删除' : 'Delete',
+                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
+                'admin': this.currentLanguage === 'zh-CN' ? '管理员' : 'Admin',
+                'user': this.currentLanguage === 'zh-CN' ? '用户' : 'User',
+                'active': this.currentLanguage === 'zh-CN' ? '活跃' : 'Active',
+                'inactive': this.currentLanguage === 'zh-CN' ? '禁用' : 'Inactive',
+                'never_logged_in': this.currentLanguage === 'zh-CN' ? '从未登录' : 'Never logged in',
+                'role_admin': this.currentLanguage === 'zh-CN' ? '管理员' : 'Administrator',
+                'role_user': this.currentLanguage === 'zh-CN' ? '用户' : 'User',
+                'enable_user': this.currentLanguage === 'zh-CN' ? '启用用户' : 'Enable User',
+                'add_user_modal': this.currentLanguage === 'zh-CN' ? '添加用户' : 'Add User',
+                'edit_user_modal': this.currentLanguage === 'zh-CN' ? '编辑用户' : 'Edit User',
+                'cancel': this.currentLanguage === 'zh-CN' ? '取消' : 'Cancel',
+                'save': this.currentLanguage === 'zh-CN' ? '保存' : 'Save',
+                'user_saved': this.currentLanguage === 'zh-CN' ? '用户已保存' : 'User Saved',
+                'user_deleted': this.currentLanguage === 'zh-CN' ? '用户已删除' : 'User Deleted',
+                'confirm_delete': this.currentLanguage === 'zh-CN' ? '确定要删除此用户吗？' : 'Are you sure you want to delete this user?'
+            },
+            'test': {
+                'title': this.currentLanguage === 'zh-CN' ? 'API测试' : 'API Testing',
+                'subtitle': this.currentLanguage === 'zh-CN' ? '测试Claude API的功能和性能' : 'Test Claude API functionality and performance',
+                'connection_test': this.currentLanguage === 'zh-CN' ? '连接测试' : 'Connection Test',
+                'connection_test_desc': this.currentLanguage === 'zh-CN' ? '测试与OpenAI API的连接状态' : 'Test connection status with OpenAI API',
+                'test_connection': this.currentLanguage === 'zh-CN' ? '测试连接' : 'Test Connection',
+                'message_test': this.currentLanguage === 'zh-CN' ? '消息测试' : 'Message Test',
+                'select_model': this.currentLanguage === 'zh-CN' ? '选择模型' : 'Select Model',
+                'test_message': this.currentLanguage === 'zh-CN' ? '测试消息' : 'Test Message',
+                'test_message_placeholder': this.currentLanguage === 'zh-CN' ? '输入要测试的消息...' : 'Enter test message...',
+                'stream_response': this.currentLanguage === 'zh-CN' ? '流式响应' : 'Stream Response',
+                'send_test': this.currentLanguage === 'zh-CN' ? '发送测试' : 'Send Test',
+                'testing': this.currentLanguage === 'zh-CN' ? '测试中...' : 'Testing...',
+                'sending': this.currentLanguage === 'zh-CN' ? '发送中...' : 'Sending...',
+                'connection_success': this.currentLanguage === 'zh-CN' ? '连接测试成功' : 'Connection Test Successful',
+                'connection_failed': this.currentLanguage === 'zh-CN' ? '连接测试失败' : 'Connection Test Failed',
+                'message_sent': this.currentLanguage === 'zh-CN' ? '消息发送成功' : 'Message Sent Successfully',
+                'request_failed': this.currentLanguage === 'zh-CN' ? '请求失败' : 'Request Failed',
+                'stream_test_success': this.currentLanguage === 'zh-CN' ? '流式响应测试成功' : 'Stream Response Test Successful',
+                'model_used': this.currentLanguage === 'zh-CN' ? '使用模型' : 'Model Used',
+                'duration': this.currentLanguage === 'zh-CN' ? '耗时' : 'Duration',
+                'response_id': this.currentLanguage === 'zh-CN' ? '响应ID' : 'Response ID',
+                'response': this.currentLanguage === 'zh-CN' ? '响应' : 'Response',
+                'input_tokens': this.currentLanguage === 'zh-CN' ? '输入Token' : 'Input Tokens',
+                'output_tokens': this.currentLanguage === 'zh-CN' ? '输出Token' : 'Output Tokens',
+                'status_code': this.currentLanguage === 'zh-CN' ? '状态码' : 'Status Code',
+                'error': this.currentLanguage === 'zh-CN' ? '错误' : 'Error',
+                'check_network': this.currentLanguage === 'zh-CN' ? '请检查网络连接' : 'Please check network connection',
+                'check_config': this.currentLanguage === 'zh-CN' ? '请检查配置' : 'Please check configuration',
+                'suggestions': this.currentLanguage === 'zh-CN' ? '建议' : 'Suggestions'
+            },
             'common': {
                 'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
                 'error': this.currentLanguage === 'zh-CN' ? '错误' : 'Error',
-                'success': this.currentLanguage === 'zh-CN' ? '成功' : 'Success'
+                'success': this.currentLanguage === 'zh-CN' ? '成功' : 'Success',
+                'network_error': this.currentLanguage === 'zh-CN' ? '网络错误，请重试' : 'Network error, please try again',
+                'loading_failed': this.currentLanguage === 'zh-CN' ? '加载失败' : 'Loading Failed',
+                'operation_failed': this.currentLanguage === 'zh-CN' ? '操作失败' : 'Operation Failed',
+                'unknown_error': this.currentLanguage === 'zh-CN' ? '未知错误' : 'Unknown Error'
+            },
+            'setup': {
+                'welcome': this.currentLanguage === 'zh-CN' ? '欢迎使用 CCany！让我们完成首次设置' : 'Welcome to CCany! Let\'s complete the initial setup',
+                'version': this.currentLanguage === 'zh-CN' ? '版本:' : 'Version:',
+                'build_time': this.currentLanguage === 'zh-CN' ? '构建时间:' : 'Build Time:',
+                'create_admin': this.currentLanguage === 'zh-CN' ? '创建管理员账户' : 'Create Administrator Account',
+                'admin_username': this.currentLanguage === 'zh-CN' ? '管理员用户名' : 'Administrator Username',
+                'admin_password': this.currentLanguage === 'zh-CN' ? '管理员密码' : 'Administrator Password',
+                'confirm_password': this.currentLanguage === 'zh-CN' ? '确认密码' : 'Confirm Password',
+                'password_requirements': this.currentLanguage === 'zh-CN' ? '密码至少6个字符，建议包含大小写字母、数字和特殊字符' : 'Password must be at least 6 characters, recommend including uppercase letters, lowercase letters, numbers and special characters',
+                'create_account': this.currentLanguage === 'zh-CN' ? '创建管理员账户' : 'Create Administrator Account',
+                'creating_account': this.currentLanguage === 'zh-CN' ? '正在创建管理员账户...' : 'Creating administrator account...',
+                'setup_complete': this.currentLanguage === 'zh-CN' ? '✅ 设置完成！' : '✅ Setup Complete!',
+                'account_created': this.currentLanguage === 'zh-CN' ? '管理员账户已创建成功。您现在可以登录到系统。' : 'Administrator account has been created successfully. You can now log in to the system.',
+                'go_to_login': this.currentLanguage === 'zh-CN' ? '前往登录' : 'Go to Login'
             }
         };
         console.log('Using fallback translations for language:', this.currentLanguage);
@@ -201,6 +796,31 @@ class ClaudeProxyApp {
                 element.placeholder = translation;
             } else {
                 element.textContent = translation;
+            }
+        });
+        
+        // Update all elements with data-i18n-placeholder attributes
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+            const key = element.getAttribute('data-i18n-placeholder');
+            const translation = this.t(key);
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.placeholder = translation;
+            }
+        });
+        
+        // Update all elements with data-i18n-title attributes
+        document.querySelectorAll('[data-i18n-title]').forEach(element => {
+            const key = element.getAttribute('data-i18n-title');
+            const translation = this.t(key);
+            element.title = translation;
+        });
+        
+        // Update all elements with data-i18n-value attributes
+        document.querySelectorAll('[data-i18n-value]').forEach(element => {
+            const key = element.getAttribute('data-i18n-value');
+            const translation = this.t(key);
+            if (element.tagName === 'INPUT' && element.type === 'button') {
+                element.value = translation;
             }
         });
         
@@ -432,6 +1052,32 @@ class ClaudeProxyApp {
             saveConfigBtn.addEventListener('click', () => this.saveConfig());
         }
 
+        // JWT密钥生成按钮
+        const generateJwtBtn = document.getElementById('generateJwtBtn');
+        if (generateJwtBtn) {
+            generateJwtBtn.addEventListener('click', () => {
+                const jwtSecretInput = document.getElementById('jwtSecret');
+                if (jwtSecretInput) {
+                    // Generate a random UUID for JWT secret
+                    const uuid = this.generateUUID();
+                    jwtSecretInput.value = uuid;
+                    
+                    // Show a brief success indication
+                    const originalText = generateJwtBtn.textContent;
+                    generateJwtBtn.textContent = '✅ 已生成';
+                    generateJwtBtn.style.background = 'var(--success-color)';
+                    
+                    setTimeout(() => {
+                        generateJwtBtn.textContent = originalText;
+                        generateJwtBtn.style.background = '';
+                    }, 2000);
+                }
+            });
+        }
+
+        // 初始化Anthropic Base URL
+        this.initializeAnthropicBaseUrl();
+
         // API密钥测试按钮
         const testApiKeyBtn = document.getElementById('testApiKeyBtn');
         if (testApiKeyBtn) {
@@ -529,9 +1175,16 @@ class ClaudeProxyApp {
         const loginError = document.getElementById('loginError');
         const loginBtn = document.querySelector('.login-btn');
 
-        loginBtn.disabled = true;
-        loginBtn.textContent = this.t('login.logging_in');
+        // Enhanced loading state
+        this.uiController.showLoadingState(loginBtn, this.t('login.logging_in'));
         loginError.classList.remove('show');
+
+        // Add form validation animations
+        const usernameField = document.getElementById('username');
+        const passwordField = document.getElementById('password');
+        
+        this.uiController.validateFormField(usernameField, username.length > 0);
+        this.uiController.validateFormField(passwordField, password.length > 0);
 
         try {
             const response = await fetch('/auth/login', {
@@ -548,19 +1201,34 @@ class ClaudeProxyApp {
                 localStorage.setItem('auth_token', data.token);
                 this.currentUser = data.user;
                 this.isAuthenticated = true;
-                this.showMainApp();
-                this.loadInitialData();
+                
+                // Show success animation
+                this.uiController.showEnhancedNotification(this.t('login.login_success') || '登录成功', 'success');
+                
+                // Smooth transition to main app
+                setTimeout(() => {
+                    this.showMainApp();
+                    this.loadInitialData();
+                }, 500);
             } else {
                 loginError.textContent = data.error || this.t('login.login_error');
                 loginError.classList.add('show');
+                
+                // Shake animation for login form
+                const loginCard = document.querySelector('.login-card');
+                if (loginCard) {
+                    loginCard.classList.add('animate-shake');
+                    setTimeout(() => {
+                        loginCard.classList.remove('animate-shake');
+                    }, 500);
+                }
             }
         } catch (error) {
             console.error('Login failed:', error);
             loginError.textContent = this.t('login.network_error');
             loginError.classList.add('show');
         } finally {
-            loginBtn.disabled = false;
-            loginBtn.textContent = this.t('login.login_button');
+            this.uiController.hideLoadingState(loginBtn);
         }
     }
 
@@ -637,35 +1305,66 @@ class ClaudeProxyApp {
     }
 
     switchTab(tabName) {
-        // 更新菜单状态
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-
-        // 更新内容区域
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(tabName).classList.add('active');
-
-        this.currentTab = tabName;
-
-        // 加载对应数据
-        switch (tabName) {
-            case 'dashboard':
-                this.loadDashboardData();
-                break;
-            case 'requests':
-                this.loadRequestLogs();
-                break;
-            case 'config':
-                this.loadConfig();
-                break;
-            case 'users':
-                this.loadUsers();
-                break;
+        // Prevent rapid tab switching
+        if (this.debounceTimers.has('tabSwitch')) {
+            clearTimeout(this.debounceTimers.get('tabSwitch'));
         }
+        
+        this.debounceTimers.set('tabSwitch', setTimeout(() => {
+            // 更新菜单状态
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+            // Enhanced tab content switching with animations
+            const currentContent = document.querySelector('.tab-content.active');
+            const newContent = document.getElementById(tabName);
+            
+            if (currentContent && newContent && currentContent !== newContent) {
+                // Fade out current content
+                currentContent.style.opacity = '0';
+                currentContent.style.transform = 'translateX(-20px)';
+                
+                setTimeout(() => {
+                    currentContent.classList.remove('active');
+                    newContent.classList.add('active');
+                    
+                    // Fade in new content
+                    newContent.style.opacity = '0';
+                    newContent.style.transform = 'translateX(20px)';
+                    
+                    setTimeout(() => {
+                        newContent.style.opacity = '1';
+                        newContent.style.transform = 'translateX(0)';
+                    }, 50);
+                }, 150);
+            } else if (newContent) {
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                newContent.classList.add('active');
+                newContent.classList.add('animate-fade-in');
+            }
+
+            this.currentTab = tabName;
+
+            // 加载对应数据
+            switch (tabName) {
+                case 'dashboard':
+                    this.loadDashboardData();
+                    break;
+                case 'requests':
+                    this.loadRequestLogs();
+                    break;
+                case 'config':
+                    this.loadConfig();
+                    break;
+                case 'users':
+                    this.loadUsers();
+                    break;
+            }
+        }, 100));
     }
 
     async loadInitialData() {
@@ -700,13 +1399,20 @@ class ClaudeProxyApp {
 
     async loadConfig() {
         try {
+            console.log('Loading configuration from backend...');
             const response = await this.apiCall('/admin/config');
+            console.log('Config response status:', response.status);
             const data = await response.json();
+            console.log('Config response data:', data);
             this.config = data.config;
+            console.log('Parsed config:', this.config);
             
             // 更新配置页面
             if (this.config) {
+                console.log('Updating config display...');
                 this.updateConfigDisplay();
+            } else {
+                console.warn('No config data received from backend');
             }
         } catch (error) {
             console.error('加载配置失败:', error);
@@ -716,18 +1422,17 @@ class ClaudeProxyApp {
     updateConfigDisplay() {
         const elements = {
             'openaiApiKey': this.config.openai_api_key,
-            'claudeApiKey': this.config.claude_api_key,
+            'anthropicAuthToken': this.config.claude_api_key,
             'openaiBaseUrl': this.config.openai_base_url,
-            'claudeBaseUrl': this.config.claude_base_url,
+            'anthropicBaseUrl': this.config.claude_base_url,
             'bigModel': this.config.big_model,
             'smallModel': this.config.small_model,
-            'maxTokens': this.config.max_tokens_limit,
+            'maxTokensLimit': this.config.max_tokens_limit,
             'requestTimeout': this.config.request_timeout,
             'serverHost': this.config.host,
             'serverPort': this.config.port,
             'logLevel': this.config.log_level,
             'jwtSecret': this.config.jwt_secret,
-            'dbEncryptKey': this.config.db_encrypt_key,
             'encryptAlgo': this.config.encrypt_algorithm
         };
 
@@ -741,6 +1446,9 @@ class ClaudeProxyApp {
                 }
             }
         });
+        
+        // 初始化Anthropic Base URL为当前页面URL
+        this.initializeAnthropicBaseUrl();
 
         // 更新仪表板中的当前模型
         const currentModelElement = document.getElementById('currentModel');
@@ -752,51 +1460,68 @@ class ClaudeProxyApp {
     async saveConfig() {
         const configData = {
             openai_api_key: document.getElementById('openaiApiKey').value,
-            claude_api_key: document.getElementById('claudeApiKey').value,
+            claude_api_key: document.getElementById('anthropicAuthToken').value,
             openai_base_url: document.getElementById('openaiBaseUrl').value,
-            claude_base_url: document.getElementById('claudeBaseUrl').value,
+            claude_base_url: document.getElementById('anthropicBaseUrl').value,
             big_model: document.getElementById('bigModel').value,
             small_model: document.getElementById('smallModel').value,
-            max_tokens_limit: parseInt(document.getElementById('maxTokens').value) || 4096,
+            max_tokens_limit: parseInt(document.getElementById('maxTokensLimit').value) || 4096,
             request_timeout: parseInt(document.getElementById('requestTimeout').value) || 90,
             host: document.getElementById('serverHost').value,
             port: parseInt(document.getElementById('serverPort').value) || 8080,
             log_level: document.getElementById('logLevel').value,
             jwt_secret: document.getElementById('jwtSecret').value,
-            db_encrypt_key: document.getElementById('dbEncryptKey').value,
-            encrypt_algorithm: document.getElementById('encryptAlgo').value,
-            stream_enabled: document.getElementById('streamEnabled').checked
+            encrypt_algorithm: document.getElementById('encryptAlgo').value
         };
+
+        console.log('Saving configuration data:', configData);
 
         const resultElement = document.getElementById('configResult');
         const saveBtn = document.getElementById('saveConfigBtn');
 
-        saveBtn.disabled = true;
-        saveBtn.textContent = this.t('config.saving');
+        // Enhanced loading state
+        this.uiController.showLoadingState(saveBtn, this.t('config.saving'));
 
         try {
+            console.log('Sending PUT request to /admin/config');
             const response = await this.apiCall('/admin/config', {
                 method: 'PUT',
                 body: JSON.stringify(configData)
             });
 
+            console.log('Save config response status:', response.status);
             const data = await response.json();
+            console.log('Save config response data:', data);
 
             if (response.ok) {
                 resultElement.className = 'config-result success';
                 resultElement.textContent = this.t('config.config_saved');
                 this.config = data.config;
+                
+                console.log('Configuration saved successfully, updated count:', data.updated);
+                
+                // Show success animation
+                this.uiController.showEnhancedNotification(this.t('config.config_saved'), 'success');
+                
+                // Animate the result element
+                resultElement.classList.add('animate-fade-in');
             } else {
+                console.error('Save config failed with status:', response.status, 'data:', data);
                 resultElement.className = 'config-result error';
                 resultElement.textContent = data.error || this.t('config.save_failed');
+                
+                // Shake animation for error
+                resultElement.classList.add('animate-shake');
+                setTimeout(() => {
+                    resultElement.classList.remove('animate-shake');
+                }, 500);
             }
         } catch (error) {
             console.error('保存配置失败:', error);
             resultElement.className = 'config-result error';
             resultElement.textContent = this.t('common.network_error');
         } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = this.t('config.save_config');
+            this.uiController.hideLoadingState(saveBtn);
         }
     }
 
@@ -1058,72 +1783,75 @@ class ClaudeProxyApp {
     }
 
     showNotification(message, type = 'info') {
-        // 简单的通知实现
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 2000;
-            opacity: 0;
-            transform: translateY(-20px);
-            transition: all 0.3s ease;
-        `;
-
-        if (type === 'success') {
-            notification.style.backgroundColor = '#34C759';
-        } else if (type === 'error') {
-            notification.style.backgroundColor = '#FF3B30';
-        } else {
-            notification.style.backgroundColor = '#007AFF';
-        }
-
-        document.body.appendChild(notification);
-
-        // 显示动画
-        setTimeout(() => {
-            notification.style.opacity = '1';
-            notification.style.transform = 'translateY(0)';
-        }, 100);
-
-        // 自动消失
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateY(-20px)';
-            setTimeout(() => {
-                document.body.removeChild(notification);
-            }, 300);
-        }, 3000);
+        // Use enhanced notification system
+        this.uiController.showEnhancedNotification(message, type);
     }
 
     async loadDashboardData() {
-        // 模拟统计数据（实际项目中应该从后端API获取）
-        const mockStats = {
-            totalRequests: Math.floor(Math.random() * 10000) + 1000,
-            avgResponseTime: (Math.random() * 2000 + 500).toFixed(0) + 'ms',
-            successRate: (95 + Math.random() * 4).toFixed(1) + '%',
-            tokensUsed: this.formatNumber(Math.floor(Math.random() * 1000000) + 100000)
-        };
+        try {
+            // 获取真实的系统信息
+            const response = await this.apiCall('/admin/monitoring/info');
+            const data = await response.json();
+            
+            // 解析真实数据
+            const stats = {
+                totalRequests: this.formatNumber(data.performance.request_count || 0),
+                avgResponseTime: data.performance.avg_response_time ? `${data.performance.avg_response_time.toFixed(0)}ms` : '0ms',
+                successRate: data.performance.request_count > 0 ? 
+                    `${(((data.performance.request_count - data.performance.error_count) / data.performance.request_count) * 100).toFixed(1)}%` : '100%',
+                tokensUsed: this.formatNumber(data.performance.token_count || 0)
+            };
 
-        // 更新统计卡片
-        Object.entries(mockStats).forEach(([key, value]) => {
-            const element = document.getElementById(key);
-            if (element) {
-                element.textContent = value;
+            // 更新仪表板显示
+            Object.entries(stats).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) {
+                    // 为数值类型添加动画效果
+                    if (key === 'totalRequests') {
+                        const numericValue = parseInt(value);
+                        const currentValue = parseInt(element.textContent) || 0;
+                        if (numericValue !== currentValue) {
+                            this.uiController.animateCounter(element, currentValue, numericValue);
+                        }
+                    } else {
+                        // 其他值使用淡入淡出效果
+                        element.style.opacity = '0.5';
+                        setTimeout(() => {
+                            element.textContent = value;
+                            element.style.opacity = '1';
+                        }, 150);
+                    }
+                }
+            });
+
+            // 更新系统信息
+            const versionElement = document.getElementById('version');
+            if (versionElement) {
+                versionElement.textContent = data.application.version || 'Unknown';
             }
-        });
 
-        // 更新运行时间
-        const uptimeElement = document.getElementById('uptime');
-        if (uptimeElement) {
-            const uptime = this.calculateUptime();
-            uptimeElement.textContent = uptime;
+            const uptimeElement = document.getElementById('uptime');
+            if (uptimeElement) {
+                uptimeElement.textContent = data.application.uptime || 'Unknown';
+            }
+
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            
+            // 如果API调用失败，显示错误信息
+            const errorStats = {
+                totalRequests: 'N/A',
+                avgResponseTime: 'N/A',
+                successRate: 'N/A',
+                tokensUsed: 'N/A'
+            };
+
+            Object.entries(errorStats).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.textContent = value;
+                }
+            });
         }
 
         // 加载最近请求
@@ -1134,28 +1862,40 @@ class ClaudeProxyApp {
         const recentRequestsElement = document.getElementById('recentRequests');
         if (!recentRequestsElement) return;
 
-        // 模拟最近请求数据
-        const mockRequests = [
-            { time: '2分钟前', model: 'Claude 3.5 Sonnet', status: 'success', tokens: 1250 },
-            { time: '5分钟前', model: 'Claude 3 Haiku', status: 'success', tokens: 890 },
-            { time: '8分钟前', model: 'Claude 3.5 Sonnet', status: 'error', tokens: 0 },
-            { time: '12分钟前', model: 'Claude 3 Haiku', status: 'success', tokens: 456 }
-        ];
+        try {
+            // 获取真实的最近请求数据
+            const response = await this.apiCall('/admin/request-logs?limit=5');
+            const data = await response.json();
+            
+            if (data.requests && data.requests.length > 0) {
+                const html = data.requests.map(req => {
+                    const time = new Date(req.created_at).toLocaleString();
+                    const statusClass = req.status === 'success' ? 'success' : req.status === 'error' ? 'error' : 'warning';
+                    const statusText = req.status === 'success' ? this.t('requests.success') : 
+                                     req.status === 'error' ? this.t('requests.failed') : this.t('requests.warning');
+                    
+                    return `
+                        <div class="recent-request-item">
+                            <div class="request-info">
+                                <span class="request-time">${time}</span>
+                                <span class="request-model">${req.model || 'Unknown'}</span>
+                            </div>
+                            <div class="request-status">
+                                <span class="status-badge ${statusClass}">${statusText}</span>
+                                <span class="request-tokens">${req.input_tokens || 0} / ${req.output_tokens || 0} tokens</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
 
-        const html = mockRequests.map(req => `
-            <div class="recent-request-item">
-                <div class="request-info">
-                    <span class="request-time">${req.time}</span>
-                    <span class="request-model">${req.model}</span>
-                </div>
-                <div class="request-status">
-                    <span class="status-badge ${req.status}">${req.status === 'success' ? this.t('requests.success') : this.t('requests.failed')}</span>
-                    <span class="request-tokens">${req.tokens} tokens</span>
-                </div>
-            </div>
-        `).join('');
-
-        recentRequestsElement.innerHTML = html;
+                recentRequestsElement.innerHTML = html;
+            } else {
+                recentRequestsElement.innerHTML = '<p class="no-data">No recent requests</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load recent requests:', error);
+            recentRequestsElement.innerHTML = '<p class="error-message">Failed to load recent requests</p>';
+        }
     }
 
     async loadRequestLogs() {
@@ -1389,7 +2129,7 @@ class ClaudeProxyApp {
         return time.toLocaleString('zh-CN');
     }
 
-    // 显示加载指示器
+    // Enhanced loading indicator with Claude branding
     showLoadingIndicator() {
         // 创建加载指示器如果不存在
         let loadingIndicator = document.getElementById('appLoadingIndicator');
@@ -1397,13 +2137,102 @@ class ClaudeProxyApp {
             loadingIndicator = document.createElement('div');
             loadingIndicator.id = 'appLoadingIndicator';
             loadingIndicator.innerHTML = `
-                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.9);
-                            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;">
-                    <div style="width: 50px; height: 50px; border: 3px solid #f3f3f3; border-top: 3px solid #007AFF;
-                               border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                    <p style="margin-top: 20px; font-size: 16px; color: #666;">正在加载...</p>
+                <div class="loading-overlay">
+                    <div class="loading-container">
+                        <div class="loading-logo">
+                            <div class="logo-icon animate-pulse">🤖</div>
+                            <h2 class="logo-text">CCany</h2>
+                        </div>
+                        <div class="loading-spinner-container">
+                            <div class="loading-spinner enhanced"></div>
+                        </div>
+                        <p class="loading-text">正在加载...</p>
+                        <div class="loading-progress">
+                            <div class="progress-bar"></div>
+                        </div>
+                    </div>
                 </div>
                 <style>
+                    .loading-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(74, 144, 226, 0.1));
+                        backdrop-filter: blur(10px);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 9999;
+                        animation: fadeIn 0.3s ease;
+                    }
+                    .loading-container {
+                        text-align: center;
+                        padding: 40px;
+                        background: rgba(255, 255, 255, 0.9);
+                        border-radius: 24px;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                        backdrop-filter: blur(20px);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+                    .loading-logo {
+                        margin-bottom: 30px;
+                    }
+                    .logo-icon {
+                        font-size: 48px;
+                        margin-bottom: 15px;
+                        background: linear-gradient(135deg, var(--claude-primary), var(--claude-secondary));
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                    }
+                    .logo-text {
+                        font-size: 24px;
+                        font-weight: 600;
+                        background: linear-gradient(135deg, var(--claude-primary), var(--claude-secondary));
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                        margin: 0;
+                    }
+                    .loading-spinner-container {
+                        margin: 30px 0;
+                    }
+                    .loading-spinner.enhanced {
+                        width: 60px;
+                        height: 60px;
+                        border: 4px solid transparent;
+                        border-top: 4px solid var(--claude-primary);
+                        border-right: 4px solid var(--claude-secondary);
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto;
+                    }
+                    .loading-text {
+                        font-size: 16px;
+                        color: var(--text-secondary);
+                        margin: 20px 0;
+                        font-weight: 500;
+                    }
+                    .loading-progress {
+                        width: 200px;
+                        height: 4px;
+                        background: rgba(0, 0, 0, 0.1);
+                        border-radius: 2px;
+                        overflow: hidden;
+                        margin: 0 auto;
+                    }
+                    .progress-bar {
+                        height: 100%;
+                        background: linear-gradient(135deg, var(--claude-primary), var(--claude-secondary));
+                        animation: progress 2s ease-in-out infinite;
+                    }
+                    @keyframes progress {
+                        0% { width: 0%; }
+                        50% { width: 70%; }
+                        100% { width: 100%; }
+                    }
                     @keyframes spin {
                         0% { transform: rotate(0deg); }
                         100% { transform: rotate(360deg); }
@@ -1478,6 +2307,32 @@ class ClaudeProxyApp {
         }
         
         console.log('Language selectors updated to:', this.currentLanguage);
+    }
+
+    // Utility method to generate UUID
+    generateUUID() {
+        // Generate a random UUID v4
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    // Initialize Anthropic Base URL with current page URL
+    initializeAnthropicBaseUrl() {
+        const anthropicBaseUrlInput = document.getElementById('anthropicBaseUrl');
+        if (anthropicBaseUrlInput) {
+            // Get current page's base URL
+            const protocol = window.location.protocol; // http: or https:
+            const host = window.location.host; // hostname:port
+            const baseUrl = `${protocol}//${host}`;
+            
+            // Set the value if it's empty or not already set
+            if (!anthropicBaseUrlInput.value || anthropicBaseUrlInput.value === 'https://api.anthropic.com') {
+                anthropicBaseUrlInput.value = baseUrl;
+            }
+        }
     }
 }
 
@@ -1561,7 +2416,56 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // 添加样式到页面
     const styleSheet = document.createElement('style');
-    styleSheet.textContent = additionalStyles;
+    styleSheet.textContent = additionalStyles + `
+        /* Enhanced animations for better UX */
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .field-valid input, .field-valid select, .field-valid textarea {
+            border-color: var(--success-color) !important;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+        }
+        
+        .field-invalid input, .field-invalid select, .field-invalid textarea {
+            border-color: var(--error-color) !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+        }
+        
+        .loading-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .tab-content {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .notification {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            max-width: 500px;
+        }
+        
+        .notification-content {
+            flex: 1;
+        }
+        
+        .notification-message {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+    `;
     document.head.appendChild(styleSheet);
     
     const app = new ClaudeProxyApp();

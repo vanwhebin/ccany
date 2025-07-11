@@ -23,6 +23,8 @@ type ClaudeMessagesRequest struct {
 	StopSequences []string        `json:"stop_sequences,omitempty"`
 	Tools         []ClaudeTool    `json:"tools,omitempty"`
 	ToolChoice    interface{}     `json:"tool_choice,omitempty"`
+	Thinking      bool            `json:"thinking,omitempty"` // Support for Claude Code thinking mode
+	Metadata      interface{}     `json:"metadata,omitempty"` // Additional metadata for Claude Code
 }
 
 // ClaudeTool represents a tool in Claude format
@@ -62,17 +64,69 @@ type ClaudeContentBlock struct {
 
 // ClaudeUsage represents usage information
 type ClaudeUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens          int `json:"input_tokens"`
+	OutputTokens         int `json:"output_tokens"`
+	CacheReadInputTokens int `json:"cache_read_input_tokens,omitempty"` // Support for cache token usage
 }
 
 // ClaudeStreamEvent represents a streaming event
 type ClaudeStreamEvent struct {
-	Type    string              `json:"type"`
-	Message *ClaudeResponse     `json:"message,omitempty"`
-	Index   int                 `json:"index,omitempty"`
-	Delta   *ClaudeContentBlock `json:"delta,omitempty"`
-	Usage   *ClaudeUsage        `json:"usage,omitempty"`
+	Type         string              `json:"type"`
+	Message      *ClaudeResponse     `json:"message,omitempty"`
+	Index        int                 `json:"index,omitempty"`
+	Delta        *ClaudeContentBlock `json:"delta,omitempty"`
+	Usage        *ClaudeUsage        `json:"usage,omitempty"`
+	ContentBlock *ClaudeContentBlock `json:"content_block,omitempty"` // For content_block_start event
+}
+
+// ClaudeStreamStartEvent represents the message_start event
+type ClaudeStreamStartEvent struct {
+	Type    string         `json:"type"`
+	Message ClaudeResponse `json:"message"`
+}
+
+// ClaudeStreamContentBlockStartEvent represents the content_block_start event
+type ClaudeStreamContentBlockStartEvent struct {
+	Type         string             `json:"type"`
+	Index        int                `json:"index"`
+	ContentBlock ClaudeContentBlock `json:"content_block"`
+}
+
+// ClaudeStreamContentBlockStopEvent represents the content_block_stop event
+type ClaudeStreamContentBlockStopEvent struct {
+	Type  string `json:"type"`
+	Index int    `json:"index"`
+}
+
+// ClaudeStreamPingEvent represents the ping event
+type ClaudeStreamPingEvent struct {
+	Type string `json:"type"`
+}
+
+// ClaudeStreamMessageDeltaEvent represents the message_delta event
+type ClaudeStreamMessageDeltaEvent struct {
+	Type  string             `json:"type"`
+	Delta ClaudeMessageDelta `json:"delta"`
+	Usage *ClaudeUsage       `json:"usage,omitempty"`
+}
+
+// ClaudeStreamMessageStopEvent represents the message_stop event
+type ClaudeStreamMessageStopEvent struct {
+	Type string `json:"type"`
+}
+
+// ClaudeMessageDelta represents delta information for message updates
+type ClaudeMessageDelta struct {
+	StopReason   string  `json:"stop_reason,omitempty"`
+	StopSequence *string `json:"stop_sequence,omitempty"`
+}
+
+// ClaudeContentBlockDelta represents delta information for content updates
+type ClaudeContentBlockDelta struct {
+	Type        string      `json:"type"`
+	Text        string      `json:"text,omitempty"`
+	PartialJSON string      `json:"partial_json,omitempty"` // For tool call streaming
+	InputJSON   interface{} `json:"input_json,omitempty"`   // For tool call completion
 }
 
 // ClaudeErrorResponse represents an error response

@@ -1,7 +1,6 @@
 package converter
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -70,16 +69,16 @@ func mapClaudeModelToOpenAI(claudeModel, bigModel, smallModel string) string {
 }
 
 // convertMessages converts Claude messages to OpenAI format
-func convertMessages(claudeMessages []models.ClaudeMessage, system interface{}) ([]models.OpenAIMessage, error) {
-	var openaiMessages []models.OpenAIMessage
+func convertMessages(claudeMessages []models.ClaudeMessage, system interface{}) ([]models.Message, error) {
+	var openaiMessages []models.Message
 
 	// Add system message if present
 	if system != nil {
-		systemContent, err := convertContent(system)
+		systemContent, err := convertContentToString(system)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert system message: %w", err)
 		}
-		openaiMessages = append(openaiMessages, models.OpenAIMessage{
+		openaiMessages = append(openaiMessages, models.Message{
 			Role:    "system",
 			Content: systemContent,
 		})
@@ -87,12 +86,12 @@ func convertMessages(claudeMessages []models.ClaudeMessage, system interface{}) 
 
 	// Convert regular messages
 	for _, msg := range claudeMessages {
-		content, err := convertContent(msg.Content)
+		content, err := convertContentToString(msg.Content)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert message content: %w", err)
 		}
 
-		openaiMsg := models.OpenAIMessage{
+		openaiMsg := models.Message{
 			Role:    msg.Role,
 			Content: content,
 		}
@@ -103,85 +102,36 @@ func convertMessages(claudeMessages []models.ClaudeMessage, system interface{}) 
 	return openaiMessages, nil
 }
 
-// convertContent converts Claude content to OpenAI format
-func convertContent(content interface{}) (interface{}, error) {
+// convertContentToString converts Claude content to a simple string format
+func convertContentToString(content interface{}) (string, error) {
 	switch v := content.(type) {
 	case string:
 		return v, nil
 	case []interface{}:
-		// Handle content blocks
-		var parts []map[string]interface{}
+		// Handle content blocks - extract text content
+		var textParts []string
 		for _, block := range v {
 			if blockMap, ok := block.(map[string]interface{}); ok {
-				part := make(map[string]interface{})
-
 				if blockType, exists := blockMap["type"]; exists {
 					switch blockType {
 					case "text":
-						part["type"] = "text"
 						if text, exists := blockMap["text"]; exists {
-							part["text"] = text
-						}
-					case "image":
-						part["type"] = "image_url"
-						if source, exists := blockMap["source"]; exists {
-							if sourceMap, ok := source.(map[string]interface{}); ok {
-								if mediaType, exists := sourceMap["media_type"]; exists {
-									if data, exists := sourceMap["data"]; exists {
-										imageURL := fmt.Sprintf("data:%s;base64,%s", mediaType, data)
-										part["image_url"] = map[string]interface{}{
-											"url": imageURL,
-										}
-									}
-								}
+							if textStr, ok := text.(string); ok {
+								textParts = append(textParts, textStr)
 							}
 						}
-					case "tool_use":
-						// Handle tool use - convert to OpenAI tool call format
-						if name, exists := blockMap["name"]; exists {
-							if input, exists := blockMap["input"]; exists {
-								inputJSON, _ := json.Marshal(input)
-								return map[string]interface{}{
-									"role": "assistant",
-									"tool_calls": []models.OpenAIToolCall{
-										{
-											ID:   fmt.Sprintf("call_%s", blockMap["id"]),
-											Type: "function",
-											Function: models.OpenAIFunctionCall{
-												Name:      name.(string),
-												Arguments: string(inputJSON),
-											},
-										},
-									},
-								}, nil
-							}
-						}
-					case "tool_result":
-						// Handle tool result - convert to OpenAI tool response format
-						if toolUseID, exists := blockMap["tool_use_id"]; exists {
-							if content, exists := blockMap["content"]; exists {
-								return map[string]interface{}{
-									"role":         "tool",
-									"tool_call_id": fmt.Sprintf("call_%s", toolUseID),
-									"content":      content,
-								}, nil
-							}
-						}
+						// For now, skip image and tool blocks in simple string conversion
 					}
-				}
-
-				if len(part) > 0 {
-					parts = append(parts, part)
 				}
 			}
 		}
-
-		if len(parts) == 1 && parts[0]["type"] == "text" {
-			return parts[0]["text"], nil
-		}
-		return parts, nil
+		return strings.Join(textParts, " "), nil
 	default:
-		return v, nil
+		// Try to convert to string
+		if str, ok := v.(string); ok {
+			return str, nil
+		}
+		return fmt.Sprintf("%v", v), nil
 	}
 }
 

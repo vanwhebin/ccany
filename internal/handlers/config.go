@@ -172,13 +172,9 @@ func (h *ConfigHandler) GetConfigObject(c *gin.Context) {
 	jwtSecret, _ := h.configManager.GetConfigValue("jwt_secret")
 	encryptAlgo, _ := h.configManager.GetConfigValue("encrypt_algorithm")
 
-	// Add these fields to response (but mask sensitive ones)
-	if jwtSecret != "" {
-		configResponse["jwt_secret"] = jwtSecret // Frontend needs this to display/edit
-	}
-	if encryptAlgo != "" {
-		configResponse["encrypt_algorithm"] = encryptAlgo
-	}
+	// Add these fields to response
+	configResponse["jwt_secret"] = jwtSecret
+	configResponse["encrypt_algorithm"] = encryptAlgo
 
 	h.logger.Info("Returning config object")
 	c.JSON(http.StatusOK, gin.H{
@@ -303,10 +299,10 @@ func (h *ConfigHandler) UpdateBulkConfig(c *gin.Context) {
 		encrypted    bool
 		shouldUpdate bool
 	}{
-		"openai_api_key":    {key: config.KeyOpenAIAPIKey, value: req.OpenAIAPIKey, encrypted: true, shouldUpdate: true},
-		"claude_api_key":    {key: config.KeyClaudeAPIKey, value: req.ClaudeAPIKey, encrypted: true, shouldUpdate: true},
-		"openai_base_url":   {key: config.KeyOpenAIBaseURL, value: req.OpenAIBaseURL, encrypted: false, shouldUpdate: true},
-		"claude_base_url":   {key: config.KeyClaudeBaseURL, value: req.ClaudeBaseURL, encrypted: false, shouldUpdate: true},
+		"openai_api_key":    {key: config.KeyOpenAIAPIKey, value: req.OpenAIAPIKey, encrypted: false, shouldUpdate: req.OpenAIAPIKey != ""},
+		"claude_api_key":    {key: config.KeyClaudeAPIKey, value: req.ClaudeAPIKey, encrypted: false, shouldUpdate: req.ClaudeAPIKey != ""},
+		"openai_base_url":   {key: config.KeyOpenAIBaseURL, value: req.OpenAIBaseURL, encrypted: false, shouldUpdate: req.OpenAIBaseURL != ""},
+		"claude_base_url":   {key: config.KeyClaudeBaseURL, value: req.ClaudeBaseURL, encrypted: false, shouldUpdate: req.ClaudeBaseURL != ""},
 		"big_model":         {key: config.KeyBigModel, value: req.BigModel, encrypted: false, shouldUpdate: req.BigModel != ""},
 		"small_model":       {key: config.KeySmallModel, value: req.SmallModel, encrypted: false, shouldUpdate: req.SmallModel != ""},
 		"max_tokens_limit":  {key: config.KeyMaxTokens, value: strconv.Itoa(req.MaxTokensLimit), encrypted: false, shouldUpdate: req.MaxTokensLimit > 0},
@@ -314,7 +310,7 @@ func (h *ConfigHandler) UpdateBulkConfig(c *gin.Context) {
 		"host":              {key: config.KeyServerHost, value: req.Host, encrypted: false, shouldUpdate: req.Host != ""},
 		"port":              {key: config.KeyServerPort, value: strconv.Itoa(req.Port), encrypted: false, shouldUpdate: req.Port > 0},
 		"log_level":         {key: config.KeyLogLevel, value: req.LogLevel, encrypted: false, shouldUpdate: req.LogLevel != ""},
-		"jwt_secret":        {key: "jwt_secret", value: req.JWTSecret, encrypted: true, shouldUpdate: req.JWTSecret != ""},
+		"jwt_secret":        {key: "jwt_secret", value: req.JWTSecret, encrypted: false, shouldUpdate: req.JWTSecret != ""},
 		"encrypt_algorithm": {key: "encrypt_algorithm", value: req.EncryptAlgorithm, encrypted: false, shouldUpdate: req.EncryptAlgorithm != ""},
 	}
 
@@ -676,6 +672,14 @@ func (h *ConfigHandler) maskSensitiveValue(key string, value interface{}) interf
 	return value
 }
 
+// maskSensitiveConfigValue masks sensitive configuration values for API responses
+func (h *ConfigHandler) maskSensitiveConfigValue(key, value string) string {
+	if h.isEncryptedConfig(key) && value != "" {
+		return "***masked***"
+	}
+	return value
+}
+
 // getConfigCategory gets configuration category
 func (h *ConfigHandler) getConfigCategory(key string) string {
 	switch key {
@@ -707,7 +711,7 @@ func (h *ConfigHandler) getConfigType(key string) string {
 // isEncryptedConfig checks if configuration is encrypted
 func (h *ConfigHandler) isEncryptedConfig(key string) bool {
 	switch key {
-	case config.KeyOpenAIAPIKey, config.KeyClaudeAPIKey:
+	case config.KeyOpenAIAPIKey, config.KeyClaudeAPIKey, "jwt_secret":
 		return true
 	default:
 		return false

@@ -95,7 +95,7 @@ func (h *HealthHandler) TestConnection(c *gin.Context) {
 	// Create a simple test request
 	testReq := &models.OpenAIChatCompletionRequest{
 		Model: cfg.SmallModel,
-		Messages: []models.OpenAIMessage{
+		Messages: []models.Message{
 			{
 				Role:    "user",
 				Content: "Hello",

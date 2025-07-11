@@ -1505,6 +1505,11 @@ class ClaudeProxyApp {
                 
                 // Animate the result element
                 resultElement.classList.add('animate-fade-in');
+                
+                // Reload the configuration to show updated values
+                setTimeout(() => {
+                    this.loadConfig();
+                }, 1000);
             } else {
                 console.error('Save config failed with status:', response.status, 'data:', data);
                 resultElement.className = 'config-result error';

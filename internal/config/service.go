@@ -83,22 +83,37 @@ func (s *Service) SetConfig(ctx context.Context, key, value string, encrypted bo
 		finalValue = encryptedValue
 	}
 
-	// try to update existing config
-	err := s.db.AppConfig.Update().
+	// Check if config exists
+	_, err := s.db.AppConfig.Query().
 		Where(appconfig.Key(key)).
-		SetValue(finalValue).
-		SetIsEncrypted(encrypted).
-		Exec(ctx)
+		Only(ctx)
 
 	if err != nil {
-		// if update fails, try to create new config
-		_, err = s.db.AppConfig.Create().
-			SetKey(key).
+		if ent.IsNotFound(err) {
+			// Config doesn't exist, create new one
+			configID := fmt.Sprintf("config_%s", key)
+
+			_, err = s.db.AppConfig.Create().
+				SetID(configID).
+				SetKey(key).
+				SetValue(finalValue).
+				SetIsEncrypted(encrypted).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to create config %s: %w", key, err)
+			}
+		} else {
+			return fmt.Errorf("failed to query config %s: %w", key, err)
+		}
+	} else {
+		// Config exists, update it
+		err = s.db.AppConfig.Update().
+			Where(appconfig.Key(key)).
 			SetValue(finalValue).
 			SetIsEncrypted(encrypted).
-			Save(ctx)
+			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to set config %s: %w", key, err)
+			return fmt.Errorf("failed to update config %s: %w", key, err)
 		}
 	}
 

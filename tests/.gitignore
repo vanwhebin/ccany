@@ -1,0 +1,19 @@
+# Git ignore file for test directory
+
+# Test environment files with potentially sensitive data
+.env.test
+*.key
+*.pem
+
+# Test artifacts
+test_results.xml
+coverage.out
+*.prof
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary test files
+temp_*
+test_temp_*

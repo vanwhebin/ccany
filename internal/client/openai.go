@@ -1,153 +1,190 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"ccany/internal/models"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 )
 
-// OpenAIClient handles communication with OpenAI API
+// OpenAIClient handles communication with OpenAI API using the official SDK
 type OpenAIClient struct {
-	apiKey     string
-	baseURL    string
-	timeout    time.Duration
-	httpClient *http.Client
-	logger     *logrus.Logger
+	client  *openai.Client
+	apiKey  string
+	baseURL string
+	timeout time.Duration
+	logger  *logrus.Logger
 }
 
-// NewOpenAIClient creates a new OpenAI client
+// NewOpenAIClient creates a new OpenAI client using the official SDK
 func NewOpenAIClient(apiKey, baseURL string, timeout int, logger *logrus.Logger) *OpenAIClient {
+	config := openai.DefaultConfig(apiKey)
+	if baseURL != "" && baseURL != "https://api.openai.com/v1" {
+		config.BaseURL = strings.TrimSuffix(baseURL, "/")
+	}
+
+	client := openai.NewClientWithConfig(config)
+
 	return &OpenAIClient{
+		client:  client,
 		apiKey:  apiKey,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		timeout: time.Duration(timeout) * time.Second,
-		httpClient: &http.Client{
-			Timeout: time.Duration(timeout) * time.Second,
-		},
-		logger: logger,
+		logger:  logger,
 	}
 }
 
-// CreateChatCompletion sends a chat completion request to OpenAI
+// CreateChatCompletion sends a chat completion request to OpenAI using the official SDK
 func (c *OpenAIClient) CreateChatCompletion(ctx context.Context, req *models.OpenAIChatCompletionRequest) (*models.OpenAIChatCompletionResponse, error) {
-	reqBody, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
 	c.logger.WithFields(logrus.Fields{
 		"model":      req.Model,
 		"stream":     req.Stream,
 		"max_tokens": req.MaxTokens,
 	}).Debug("Sending OpenAI chat completion request")
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/chat/completions", bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	// Convert our request to OpenAI SDK format
+	openaiReq := openai.ChatCompletionRequest{
+		Model:    req.Model,
+		Messages: convertMessages(req.Messages),
+		Stream:   req.Stream,
 	}
 
-	c.setHeaders(httpReq)
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+	// Set optional fields with proper type conversion
+	if req.MaxTokens != nil {
+		openaiReq.MaxTokens = *req.MaxTokens
 	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			c.logger.WithError(err).Warn("Failed to close response body")
+	if req.Temperature != nil {
+		openaiReq.Temperature = float32(*req.Temperature)
+	}
+	if req.TopP != nil {
+		openaiReq.TopP = float32(*req.TopP)
+	}
+	if req.N != nil {
+		openaiReq.N = *req.N
+	}
+	if req.Stop != nil {
+		if stopSlice, ok := req.Stop.([]string); ok {
+			openaiReq.Stop = stopSlice
 		}
-	}()
+	}
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Add timeout to context
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	resp, err := c.client.CreateChatCompletion(ctxWithTimeout, openaiReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to create chat completion: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		var errorResp models.OpenAIErrorResponse
-		if err := json.Unmarshal(respBody, &errorResp); err == nil {
-			return nil, fmt.Errorf("OpenAI API error: %s", errorResp.Error.Message)
-		}
-		return nil, fmt.Errorf("OpenAI API error: status %d, body: %s", resp.StatusCode, string(respBody))
-	}
-
-	var openaiResp models.OpenAIChatCompletionResponse
-	if err := json.Unmarshal(respBody, &openaiResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	// Convert SDK response to our format
+	result := &models.OpenAIChatCompletionResponse{
+		ID:      resp.ID,
+		Object:  resp.Object,
+		Created: resp.Created,
+		Model:   resp.Model,
+		Choices: convertChoices(resp.Choices),
+		Usage: models.Usage{
+			PromptTokens:     resp.Usage.PromptTokens,
+			CompletionTokens: resp.Usage.CompletionTokens,
+			TotalTokens:      resp.Usage.TotalTokens,
+		},
 	}
 
 	c.logger.WithFields(logrus.Fields{
-		"response_id":       openaiResp.ID,
-		"model":             openaiResp.Model,
-		"prompt_tokens":     openaiResp.Usage.PromptTokens,
-		"completion_tokens": openaiResp.Usage.CompletionTokens,
+		"response_id":       result.ID,
+		"model":             result.Model,
+		"prompt_tokens":     result.Usage.PromptTokens,
+		"completion_tokens": result.Usage.CompletionTokens,
 	}).Debug("Received OpenAI chat completion response")
 
-	return &openaiResp, nil
+	return result, nil
 }
 
-// CreateChatCompletionStream sends a streaming chat completion request to OpenAI
+// CreateChatCompletionStream sends a streaming chat completion request to OpenAI using the official SDK
 func (c *OpenAIClient) CreateChatCompletionStream(ctx context.Context, req *models.OpenAIChatCompletionRequest) (<-chan StreamChunk, error) {
-	req.Stream = true
-
-	reqBody, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
 	c.logger.WithFields(logrus.Fields{
 		"model":      req.Model,
 		"stream":     true,
 		"max_tokens": req.MaxTokens,
 	}).Debug("Sending OpenAI streaming chat completion request")
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/chat/completions", bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	// Convert our request to OpenAI SDK format
+	openaiReq := openai.ChatCompletionRequest{
+		Model:    req.Model,
+		Messages: convertMessages(req.Messages),
+		Stream:   true,
 	}
 
-	c.setHeaders(httpReq)
-	httpReq.Header.Set("Accept", "text/event-stream")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+	// Set optional fields with proper type conversion
+	if req.MaxTokens != nil {
+		openaiReq.MaxTokens = *req.MaxTokens
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				c.logger.WithError(err).Warn("Failed to close response body")
-			}
-		}()
-		respBody, _ := io.ReadAll(resp.Body)
-		var errorResp models.OpenAIErrorResponse
-		if err := json.Unmarshal(respBody, &errorResp); err == nil {
-			return nil, fmt.Errorf("OpenAI API error: %s", errorResp.Error.Message)
+	if req.Temperature != nil {
+		openaiReq.Temperature = float32(*req.Temperature)
+	}
+	if req.TopP != nil {
+		openaiReq.TopP = float32(*req.TopP)
+	}
+	if req.N != nil {
+		openaiReq.N = *req.N
+	}
+	if req.Stop != nil {
+		if stopSlice, ok := req.Stop.([]string); ok {
+			openaiReq.Stop = stopSlice
 		}
-		return nil, fmt.Errorf("OpenAI API error: status %d, body: %s", resp.StatusCode, string(respBody))
+	}
+
+	// Add timeout to context
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	stream, err := c.client.CreateChatCompletionStream(ctxWithTimeout, openaiReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chat completion stream: %w", err)
 	}
 
 	streamChan := make(chan StreamChunk, 10)
 
 	go func() {
 		defer close(streamChan)
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				c.logger.WithError(err).Warn("Failed to close response body")
-			}
-		}()
+		defer stream.Close()
 
-		c.processStream(ctx, resp.Body, streamChan)
+		for {
+			select {
+			case <-ctx.Done():
+				streamChan <- StreamChunk{Error: ctx.Err(), Done: true}
+				return
+			default:
+			}
+
+			response, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					streamChan <- StreamChunk{Done: true}
+					return
+				}
+				streamChan <- StreamChunk{Error: err, Done: true}
+				return
+			}
+
+			// Convert SDK stream response to our format
+			streamResp := &models.OpenAIStreamResponse{
+				ID:      response.ID,
+				Object:  response.Object,
+				Created: response.Created,
+				Model:   response.Model,
+				Choices: convertStreamChoices(response.Choices),
+			}
+
+			streamChan <- StreamChunk{Data: streamResp}
+		}
 	}()
 
 	return streamChan, nil
@@ -160,48 +197,48 @@ type StreamChunk struct {
 	Done  bool
 }
 
-// processStream processes the SSE stream from OpenAI
-func (c *OpenAIClient) processStream(ctx context.Context, body io.Reader, streamChan chan<- StreamChunk) {
-	scanner := NewSSEScanner(body)
-
-	for scanner.Scan() {
-		select {
-		case <-ctx.Done():
-			streamChan <- StreamChunk{Error: ctx.Err(), Done: true}
-			return
-		default:
-		}
-
-		line := scanner.Text()
-
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ")
-
-			if data == "[DONE]" {
-				streamChan <- StreamChunk{Done: true}
-				return
-			}
-
-			var chunk models.OpenAIStreamResponse
-			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				c.logger.WithError(err).Warn("Failed to unmarshal stream chunk")
-				continue
-			}
-
-			streamChan <- StreamChunk{Data: &chunk}
+// convertMessages converts our message format to OpenAI SDK format
+func convertMessages(messages []models.Message) []openai.ChatCompletionMessage {
+	result := make([]openai.ChatCompletionMessage, len(messages))
+	for i, msg := range messages {
+		result[i] = openai.ChatCompletionMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		streamChan <- StreamChunk{Error: err, Done: true}
-	}
+	return result
 }
 
-// setHeaders sets the required headers for OpenAI API requests
-func (c *OpenAIClient) setHeaders(req *http.Request) {
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("User-Agent", "ccany/1.0.0")
+// convertChoices converts OpenAI SDK choices to our format
+func convertChoices(choices []openai.ChatCompletionChoice) []models.Choice {
+	result := make([]models.Choice, len(choices))
+	for i, choice := range choices {
+		result[i] = models.Choice{
+			Index: choice.Index,
+			Message: models.Message{
+				Role:    choice.Message.Role,
+				Content: choice.Message.Content,
+			},
+			FinishReason: string(choice.FinishReason),
+		}
+	}
+	return result
+}
+
+// convertStreamChoices converts OpenAI SDK stream choices to our format
+func convertStreamChoices(choices []openai.ChatCompletionStreamChoice) []models.StreamChoice {
+	result := make([]models.StreamChoice, len(choices))
+	for i, choice := range choices {
+		result[i] = models.StreamChoice{
+			Index: choice.Index,
+			Delta: models.StreamDelta{
+				Role:    choice.Delta.Role,
+				Content: choice.Delta.Content,
+			},
+			FinishReason: string(choice.FinishReason),
+		}
+	}
+	return result
 }
 
 // ClassifyError classifies OpenAI API errors

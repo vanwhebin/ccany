@@ -1,9 +1,7 @@
 package converter
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"ccany/internal/models"
 )
@@ -17,13 +15,13 @@ func ConvertOpenAIToClaudeResponse(openaiResp *models.OpenAIChatCompletionRespon
 	choice := openaiResp.Choices[0]
 
 	// Convert content
-	content, err := convertOpenAIMessageToClaudeContent(choice.Message)
+	content, err := convertMessageToClaudeContent(choice.Message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert message content: %w", err)
 	}
 
 	// Map finish reason
-	stopReason := mapOpenAIFinishReasonToClaudeStopReason(choice.FinishReason)
+	stopReason := mapFinishReasonToClaudeStopReason(choice.FinishReason)
 
 	claudeResp := &models.ClaudeResponse{
 		ID:         openaiResp.ID,
@@ -52,58 +50,21 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 	choice := openaiChunk.Choices[0]
 
 	// Handle different types of streaming events
-	if choice.Delta != nil {
-		if choice.Delta.Content != nil {
-			// Text content delta
-			if contentStr, ok := choice.Delta.Content.(string); ok && contentStr != "" {
-				events = append(events, models.ClaudeStreamEvent{
-					Type:  "content_block_delta",
-					Index: 0,
-					Delta: &models.ClaudeContentBlock{
-						Type: "text_delta",
-						Text: contentStr,
-					},
-				})
-			}
-		}
-
-		// Handle tool calls in streaming
-		if len(choice.Delta.ToolCalls) > 0 {
-			for _, toolCall := range choice.Delta.ToolCalls {
-				if toolCall.Function.Name != "" {
-					// Tool use start
-					events = append(events, models.ClaudeStreamEvent{
-						Type:  "content_block_start",
-						Index: 0,
-						Delta: &models.ClaudeContentBlock{
-							Type: "tool_use",
-							ID:   strings.TrimPrefix(toolCall.ID, "call_"),
-							Name: toolCall.Function.Name,
-						},
-					})
-				}
-
-				if toolCall.Function.Arguments != "" {
-					// Tool arguments delta
-					var input interface{}
-					if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err == nil {
-						events = append(events, models.ClaudeStreamEvent{
-							Type:  "content_block_delta",
-							Index: 0,
-							Delta: &models.ClaudeContentBlock{
-								Type:  "input_json_delta",
-								Input: input,
-							},
-						})
-					}
-				}
-			}
-		}
+	if choice.Delta.Content != "" {
+		// Text content delta
+		events = append(events, models.ClaudeStreamEvent{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: &models.ClaudeContentBlock{
+				Type: "text_delta",
+				Text: choice.Delta.Content,
+			},
+		})
 	}
 
 	// Handle finish reason
-	if choice.FinishReason != nil {
-		stopReason := mapOpenAIFinishReasonToClaudeStopReason(choice.FinishReason)
+	if choice.FinishReason != "" {
+		stopReason := mapFinishReasonToClaudeStopReason(choice.FinishReason)
 
 		events = append(events, models.ClaudeStreamEvent{
 			Type: "message_delta",
@@ -117,58 +78,16 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 	return events, nil
 }
 
-// convertOpenAIMessageToClaudeContent converts OpenAI message to Claude content blocks
-func convertOpenAIMessageToClaudeContent(msg models.OpenAIMessage) ([]models.ClaudeContentBlock, error) {
+// convertMessageToClaudeContent converts simple Message to Claude content blocks
+func convertMessageToClaudeContent(msg models.Message) ([]models.ClaudeContentBlock, error) {
 	var content []models.ClaudeContentBlock
 
-	// Handle regular text content
-	if msg.Content != nil {
-		switch v := msg.Content.(type) {
-		case string:
-			if v != "" {
-				content = append(content, models.ClaudeContentBlock{
-					Type: "text",
-					Text: v,
-				})
-			}
-		case []interface{}:
-			// Handle multi-part content
-			for _, part := range v {
-				if partMap, ok := part.(map[string]interface{}); ok {
-					if partType, exists := partMap["type"]; exists {
-						switch partType {
-						case "text":
-							if text, exists := partMap["text"]; exists {
-								content = append(content, models.ClaudeContentBlock{
-									Type: "text",
-									Text: fmt.Sprintf("%v", text),
-								})
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Handle tool calls
-	if len(msg.ToolCalls) > 0 {
-		for _, toolCall := range msg.ToolCalls {
-			var input interface{}
-			if toolCall.Function.Arguments != "" {
-				if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
-					// Log error but continue processing
-					input = toolCall.Function.Arguments
-				}
-			}
-
-			content = append(content, models.ClaudeContentBlock{
-				Type:  "tool_use",
-				ID:    strings.TrimPrefix(toolCall.ID, "call_"),
-				Name:  toolCall.Function.Name,
-				Input: input,
-			})
-		}
+	// Handle text content
+	if msg.Content != "" {
+		content = append(content, models.ClaudeContentBlock{
+			Type: "text",
+			Text: msg.Content,
+		})
 	}
 
 	// If no content, add empty text block
@@ -182,13 +101,13 @@ func convertOpenAIMessageToClaudeContent(msg models.OpenAIMessage) ([]models.Cla
 	return content, nil
 }
 
-// mapOpenAIFinishReasonToClaudeStopReason maps OpenAI finish reasons to Claude stop reasons
-func mapOpenAIFinishReasonToClaudeStopReason(finishReason *string) string {
-	if finishReason == nil {
+// mapFinishReasonToClaudeStopReason maps finish reasons to Claude stop reasons
+func mapFinishReasonToClaudeStopReason(finishReason string) string {
+	if finishReason == "" {
 		return "end_turn"
 	}
 
-	switch *finishReason {
+	switch finishReason {
 	case "stop":
 		return "end_turn"
 	case "length":

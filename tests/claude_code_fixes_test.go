@@ -4,6 +4,7 @@ import (
 	"ccany/internal/claudecode"
 	"ccany/internal/models"
 	"github.com/sirupsen/logrus"
+	"testing"
 )
 
 func TestClaudeCodeFixes(t *testing.T) {

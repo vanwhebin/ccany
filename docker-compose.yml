@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 主要应用服务
+  ccany:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ccany
+    ports:
+      - "8082:8082"
+    environment:
+      # OpenAI API配置
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - AZURE_API_VERSION=${AZURE_API_VERSION}
+      
+      # 模型配置
+      - BIG_MODEL=${BIG_MODEL:-gpt-4o}
+      - SMALL_MODEL=${SMALL_MODEL:-gpt-4o-mini}
+      
+      # 服务器配置
+      - HOST=0.0.0.0
+      - PORT=8082
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # 性能配置
+      - MAX_TOKENS_LIMIT=${MAX_TOKENS_LIMIT:-4096}
+      - MIN_TOKENS_LIMIT=${MIN_TOKENS_LIMIT:-100}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-90}
+      - MAX_RETRIES=${MAX_RETRIES:-2}
+      
+      # 数据库配置
+      - DATABASE_URL=sqlite3:///app/data/proxy.db
+      
+      # 安全配置
+      - CLAUDE_PROXY_MASTER_KEY=${CLAUDE_PROXY_MASTER_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+    volumes:
+      - ccany_data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ccany-network
+
+  # Nginx 反向代理 (可选 - 生产环境推荐)
+  nginx:
+    image: nginx:alpine
+    container_name: ccany-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - ccany
+    networks:
+      - ccany-network
+    profiles:
+      - nginx
+    restart: unless-stopped
+
+volumes:
+  ccany_data:
+    driver: local
+
+networks:
+  ccany-network:
+    driver: bridge

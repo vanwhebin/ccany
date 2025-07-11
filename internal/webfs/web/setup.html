@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Proxy - 首次设置</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        /* Setup页面特定样式 */
+        .setup-container {
+            background: var(--bg-primary);
+            border-radius: var(--radius-2xl);
+            padding: var(--spacing-2xl);
+            max-width: 500px;
+            width: 100%;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-light);
+        }
+
+        .setup-header {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .setup-header .logo {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .setup-header .subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .version-info {
+            margin-top: var(--spacing-md);
+            font-size: 12px;
+            color: var(--text-tertiary);
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-md);
+        }
+
+        .version-info span {
+            font-weight: var(--font-weight-medium);
+        }
+
+        .setup-step {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .step-title {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .step-number {
+            background: var(--primary-color);
+            color: var(--text-white);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: var(--font-weight-bold);
+            font-size: 14px;
+        }
+
+        .password-requirements {
+            margin-top: var(--spacing-xs);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .setup-button {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-lg);
+            background: var(--primary-color);
+            color: var(--text-white);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: var(--font-weight-medium);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            outline: none;
+            margin-top: var(--spacing-xl);
+        }
+
+        .setup-button:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .setup-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            font-size: 14px;
+        }
+
+        .alert-error {
+            background: var(--error-light);
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        .alert-success {
+            background: var(--success-light);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: var(--spacing-lg);
+        }
+
+        .spinner {
+            border: 3px solid var(--border-light);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            margin-top: var(--spacing-lg);
+        }
+
+        .success-message h3 {
+            color: var(--success-color);
+            margin-bottom: var(--spacing-sm);
+            font-size: 18px;
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .success-message p {
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .continue-button {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-lg);
+            background: var(--primary-color);
+            color: var(--text-white);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: var(--font-weight-medium);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            outline: none;
+        }
+
+        .continue-button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--primary-lighter) 0%, var(--primary-light) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="logo">
+                <div class="logo-icon">🚀</div>
+                <h1>Claude Proxy</h1>
+            </div>
+            <p class="subtitle">欢迎使用 Claude Proxy！让我们完成首次设置</p>
+            <div class="version-info">
+                <span>版本: <span id="appVersion">-</span></span>
+                <span>构建时间: <span id="buildTime">-</span></span>
+            </div>
+        </div>
+
+        <div id="setupForm">
+            <div class="setup-step">
+                <div class="step-title">
+                    <div class="step-number">1</div>
+                    创建管理员账户
+                </div>
+
+                <div id="alertContainer"></div>
+
+                <form id="adminSetupForm">
+                    <div class="form-group">
+                        <label for="username">管理员用户名</label>
+                        <input type="text" id="username" name="username" required minlength="3" maxlength="50">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">管理员密码</label>
+                        <input type="password" id="password" name="password" required minlength="6">
+                        <div class="password-requirements">
+                            密码至少6个字符，建议包含大小写字母、数字和特殊字符
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">确认密码</label>
+                        <input type="password" id="confirmPassword" name="confirmPassword" required>
+                    </div>
+
+                    <button type="submit" class="setup-button">创建管理员账户</button>
+                </form>
+            </div>
+
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                <p>正在创建管理员账户...</p>
+            </div>
+        </div>
+
+        <div class="success-message" id="successMessage">
+            <h3>✅ 设置完成！</h3>
+            <p>管理员账户已创建成功。您现在可以登录到系统。</p>
+            <button class="continue-button" onclick="goToLogin()">前往登录</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('adminSetupForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // 清除之前的错误消息
+            clearAlerts();
+
+            // 验证密码
+            if (password !== confirmPassword) {
+                showAlert('密码和确认密码不匹配', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showAlert('密码至少需要6个字符', 'error');
+                return;
+            }
+
+            // 显示加载状态
+            document.getElementById('setupForm').style.display = 'none';
+            document.getElementById('loadingIndicator').style.display = 'block';
+
+            try {
+                const response = await fetch('/api/setup/admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // 设置成功
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    document.getElementById('successMessage').style.display = 'block';
+                } else {
+                    // 设置失败
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    document.getElementById('setupForm').style.display = 'block';
+                    showAlert(result.error || '创建管理员账户失败', 'error');
+                }
+            } catch (error) {
+                console.error('Setup error:', error);
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('setupForm').style.display = 'block';
+                showAlert('网络错误，请稍后重试', 'error');
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertContainer.appendChild(alertDiv);
+        }
+
+        function clearAlerts() {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = '';
+        }
+
+        function goToLogin() {
+            window.location.href = '/';
+        }
+
+        // 防止重复检查的标志
+        let hasCheckedSetup = false;
+
+        // 检查是否需要设置向导
+        async function checkSetupRequired() {
+            // 防止重复调用
+            if (hasCheckedSetup) {
+                return;
+            }
+            hasCheckedSetup = true;
+
+            try {
+                const response = await fetch('/api/setup/check');
+                const result = await response.json();
+
+                if (!result.setup_required) {
+                    console.log('Setup not required, redirecting to login page');
+                    // 不需要设置，直接跳转到登录页
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Failed to check setup status:', error);
+                hasCheckedSetup = false; // 出错时允许重试
+            }
+        }
+
+        // 加载版本信息
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch('/version');
+                const data = await response.json();
+
+                const appVersionElement = document.getElementById('appVersion');
+                const buildTimeElement = document.getElementById('buildTime');
+
+                if (appVersionElement) {
+                    appVersionElement.textContent = data.version || 'dev';
+                }
+
+                if (buildTimeElement) {
+                    buildTimeElement.textContent = data.build_time || 'unknown';
+                }
+            } catch (error) {
+                console.error('获取版本信息失败:', error);
+                const appVersionElement = document.getElementById('appVersion');
+                const buildTimeElement = document.getElementById('buildTime');
+
+                if (appVersionElement) {
+                    appVersionElement.textContent = 'unknown';
+                }
+
+                if (buildTimeElement) {
+                    buildTimeElement.textContent = 'unknown';
+                }
+            }
+        }
+
+        // 页面加载时检查设置状态
+        window.addEventListener('load', function () {
+            checkSetupRequired();
+            loadVersionInfo();
+        });
+    </script>
+</body>
+
+</html>

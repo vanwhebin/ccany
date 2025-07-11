@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Proxy - 管理面板</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+
+<body>
+    <div class="app">
+        <!-- 登录界面 -->
+        <div class="login-container" id="loginContainer">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="logo">
+                        <div class="logo-icon">🚀</div>
+                        <h1>Claude Proxy</h1>
+                    </div>
+                    <p data-i18n="login.title">管理员登录</p>
+                    <div class="login-language-selector">
+                        <select id="loginLanguageSelect">
+                            <option value="zh-CN">中文</option>
+                            <option value="en-US">English</option>
+                        </select>
+                    </div>
+                </div>
+                <form class="login-form" id="loginForm">
+                    <div class="form-group">
+                        <label for="username" data-i18n="login.username">用户名</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password" data-i18n="login.password">密码</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="login-btn" data-i18n="login.login_button">登录</button>
+                </form>
+                <div class="login-error" id="loginError"></div>
+            </div>
+        </div>
+
+        <!-- 主应用界面 -->
+        <div class="main-app" id="mainApp" style="display: none;">
+            <!-- 侧边栏 -->
+            <nav class="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo">
+                        <div class="logo-icon">🚀</div>
+                        <h1>Claude Proxy</h1>
+                    </div>
+                    <div class="user-info">
+                        <div class="language-selector">
+                            <select id="languageSelect">
+                                <option value="zh-CN">中文</option>
+                                <option value="en-US">English</option>
+                            </select>
+                        </div>
+                        <span class="user-name" id="userName">管理员</span>
+                        <button class="logout-btn" id="logoutBtn" data-i18n="login.logout">退出</button>
+                    </div>
+                </div>
+
+                <div class="sidebar-menu">
+                    <a href="#dashboard" class="menu-item active" data-tab="dashboard">
+                        <span class="menu-icon">📊</span>
+                        <span class="menu-text" data-i18n="menu.dashboard">仪表板</span>
+                    </a>
+                    <a href="#requests" class="menu-item" data-tab="requests">
+                        <span class="menu-icon">📝</span>
+                        <span class="menu-text" data-i18n="menu.requests">请求日志</span>
+                    </a>
+                    <a href="#config" class="menu-item" data-tab="config">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-text" data-i18n="menu.config">配置管理</span>
+                    </a>
+                    <a href="#users" class="menu-item" data-tab="users">
+                        <span class="menu-icon">👥</span>
+                        <span class="menu-text" data-i18n="menu.users">用户管理</span>
+                    </a>
+                    <a href="#test" class="menu-item" data-tab="test">
+                        <span class="menu-icon">🧪</span>
+                        <span class="menu-text" data-i18n="menu.test">API测试</span>
+                    </a>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="status-indicator">
+                        <div class="status-dot" id="statusDot"></div>
+                        <span class="status-text" id="statusText">检查中...</span>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- 主内容区 -->
+            <main class="main-content">
+                <!-- 仪表板 -->
+                <div class="tab-content active" id="dashboard">
+                    <div class="page-header">
+                        <h2 data-i18n="dashboard.title">仪表板</h2>
+                        <p data-i18n="dashboard.subtitle">Claude Code Proxy 运行状态概览</p>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="totalRequests">-</div>
+                                <div class="stat-label" data-i18n="dashboard.total_requests">总请求数</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">⚡</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="avgResponseTime">-</div>
+                                <div class="stat-label" data-i18n="dashboard.avg_response_time">平均响应时间</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="successRate">-</div>
+                                <div class="stat-label" data-i18n="dashboard.success_rate">成功率</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">🔥</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="tokensUsed">-</div>
+                                <div class="stat-label" data-i18n="dashboard.tokens_used">Token使用量</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3 data-i18n="dashboard.system_info">系统信息</h3>
+                            <div class="info-list">
+                                <div class="info-item">
+                                    <span class="info-label" data-i18n="dashboard.version">版本:</span>
+                                    <span class="info-value">v1.0.0</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label" data-i18n="dashboard.uptime">运行时间:</span>
+                                    <span class="info-value" id="uptime">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label" data-i18n="dashboard.current_model">当前模型:</span>
+                                    <span class="info-value" id="currentModel">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3 data-i18n="dashboard.recent_requests">最近请求</h3>
+                            <div class="recent-requests" id="recentRequests">
+                                <div class="loading" data-i18n="dashboard.loading">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 请求日志 -->
+                <div class="tab-content" id="requests">
+                    <div class="page-header">
+                        <h2 data-i18n="requests.title">请求日志</h2>
+                        <p data-i18n="requests.subtitle">查看所有API请求的详细记录</p>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-header">
+                            <div class="search-box">
+                                <input type="text" placeholder="搜索请求..." id="searchInput"
+                                    data-i18n="requests.search_placeholder">
+                                <button class="search-btn">🔍</button>
+                            </div>
+                            <button class="refresh-btn" id="refreshLogs" data-i18n="requests.refresh">刷新</button>
+                        </div>
+
+                        <table class="requests-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="requests.time">时间</th>
+                                    <th data-i18n="requests.model">模型</th>
+                                    <th data-i18n="requests.status">状态</th>
+                                    <th data-i18n="requests.response_time">响应时间</th>
+                                    <th data-i18n="requests.token">Token</th>
+                                    <th data-i18n="requests.actions">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestsTableBody">
+                                <tr>
+                                    <td colspan="6" class="loading" data-i18n="requests.loading">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 配置管理 -->
+                <div class="tab-content" id="config">
+                    <div class="page-header">
+                        <h2 data-i18n="config.title">配置管理</h2>
+                        <p data-i18n="config.subtitle">管理代理服务器的配置参数</p>
+                    </div>
+
+                    <div class="config-grid">
+                        <div class="config-card">
+                            <h3 data-i18n="config.api_config">API配置</h3>
+                            <div class="form-group">
+                                <label data-i18n="config.openai_api_key">OpenAI API Key</label>
+                                <input type="password" id="openaiApiKey" placeholder="输入OpenAI API Key"
+                                    data-i18n="config.openai_api_key_placeholder">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.claude_api_key">Claude API Key</label>
+                                <input type="password" id="claudeApiKey" placeholder="输入Claude API Key"
+                                    data-i18n="config.claude_api_key_placeholder">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.openai_base_url">OpenAI Base URL</label>
+                                <input type="text" id="openaiBaseUrl" placeholder="https://api.openai.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.claude_base_url">Claude Base URL</label>
+                                <input type="text" id="claudeBaseUrl" placeholder="https://api.anthropic.com">
+                            </div>
+                            <div class="form-group">
+                                <button class="test-api-btn" id="testApiKeyBtn" data-i18n="config.test_api_key">🔍
+                                    测试API密钥</button>
+                            </div>
+                            <div class="api-test-result" id="apiTestResult"></div>
+                        </div>
+
+                        <div class="config-card">
+                            <h3 data-i18n="config.model_config">模型配置</h3>
+                            <div class="form-group">
+                                <label data-i18n="config.big_model">大模型 (Sonnet/Opus)</label>
+                                <input type="text" id="bigModel" placeholder="claude-3-5-sonnet-20241022">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.small_model">小模型 (Haiku)</label>
+                                <input type="text" id="smallModel" placeholder="claude-3-haiku-20240307">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.max_tokens">最大Token限制</label>
+                                <input type="number" id="maxTokens" placeholder="4096">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.request_timeout">请求超时 (秒)</label>
+                                <input type="number" id="requestTimeout" placeholder="90">
+                            </div>
+                        </div>
+
+                        <div class="config-card">
+                            <h3 data-i18n="config.performance_config">性能配置</h3>
+                            <div class="form-group">
+                                <label data-i18n="config.server_host">服务器地址</label>
+                                <input type="text" id="serverHost" placeholder="0.0.0.0">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.server_port">服务器端口</label>
+                                <input type="number" id="serverPort" placeholder="8080">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.log_level">日志级别</label>
+                                <select id="logLevel">
+                                    <option value="DEBUG">DEBUG</option>
+                                    <option value="INFO">INFO</option>
+                                    <option value="WARN">WARN</option>
+                                    <option value="ERROR">ERROR</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="streamEnabled"> <span
+                                        data-i18n="config.stream_enabled">启用流式响应</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="config-card">
+                            <h3 data-i18n="config.security_config">安全配置</h3>
+                            <div class="form-group">
+                                <label data-i18n="config.jwt_secret">JWT密钥</label>
+                                <input type="password" id="jwtSecret" placeholder="输入JWT密钥"
+                                    data-i18n="config.jwt_secret_placeholder">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.db_encrypt_key">数据库加密密钥</label>
+                                <input type="password" id="dbEncryptKey" placeholder="输入数据库加密密钥"
+                                    data-i18n="config.db_encrypt_key_placeholder">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="config.encrypt_algo">配置加密算法</label>
+                                <select id="encryptAlgo">
+                                    <option value="AES-256-GCM">AES-256-GCM</option>
+                                    <option value="ChaCha20-Poly1305">ChaCha20-Poly1305</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-actions">
+                        <button class="test-btn" id="testConfigBtn" data-i18n="config.test_config">测试配置</button>
+                        <button class="save-btn" id="saveConfigBtn" data-i18n="config.save_config">保存配置</button>
+                    </div>
+
+                    <div class="config-result" id="configResult"></div>
+                </div>
+
+                <!-- 用户管理 -->
+                <div class="tab-content" id="users">
+                    <div class="page-header">
+                        <h2 data-i18n="users.title">用户管理</h2>
+                        <p data-i18n="users.subtitle">管理系统用户和权限</p>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-header">
+                            <div class="search-box">
+                                <input type="text" placeholder="搜索用户..." id="searchUsers"
+                                    data-i18n="users.search_placeholder">
+                                <button class="search-btn">🔍</button>
+                            </div>
+                            <button class="add-btn" id="addUserBtn" data-i18n="users.add_user">添加用户</button>
+                        </div>
+
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="users.username">用户名</th>
+                                    <th data-i18n="users.email">邮箱</th>
+                                    <th data-i18n="users.role">角色</th>
+                                    <th data-i18n="users.status">状态</th>
+                                    <th data-i18n="users.last_login">最后登录</th>
+                                    <th data-i18n="users.actions">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="6" class="loading" data-i18n="users.loading">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- API测试 -->
+                <div class="tab-content" id="test">
+                    <div class="page-header">
+                        <h2 data-i18n="test.title">API测试</h2>
+                        <p data-i18n="test.subtitle">测试Claude API的功能和性能</p>
+                    </div>
+
+                    <div class="test-grid">
+                        <div class="test-card">
+                            <h3 data-i18n="test.connection_test">连接测试</h3>
+                            <p data-i18n="test.connection_test_desc">测试与OpenAI API的连接状态</p>
+                            <button class="test-btn" id="testConnection" data-i18n="test.test_connection">测试连接</button>
+                            <div class="test-result" id="connectionResult"></div>
+                        </div>
+
+                        <div class="test-card">
+                            <h3 data-i18n="test.message_test">消息测试</h3>
+                            <div class="form-group">
+                                <label data-i18n="test.select_model">选择模型</label>
+                                <select id="testModel">
+                                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="test.test_message">测试消息</label>
+                                <textarea id="testMessage" placeholder="输入要测试的消息..."
+                                    data-i18n="test.test_message_placeholder">你好，请简单介绍一下你自己。</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="testStream"> <span
+                                        data-i18n="test.stream_response">流式响应</span>
+                                </label>
+                            </div>
+                            <button class="test-btn" id="testMessageBtn" data-i18n="test.send_test">发送测试</button>
+                            <div class="test-result" id="messageResult"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 用户表单模态框 -->
+        <div class="modal" id="userModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="userModalTitle" data-i18n="users.add_user">添加用户</h3>
+                    <button class="close-btn" id="closeUserModal">&times;</button>
+                </div>
+                <form class="user-form" id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-group">
+                        <label for="userUsername" data-i18n="users.username">用户名</label>
+                        <input type="text" id="userUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail" data-i18n="users.email">邮箱</label>
+                        <input type="email" id="userEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userPassword" data-i18n="users.password">密码</label>
+                        <input type="password" id="userPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userRole" data-i18n="users.role">角色</label>
+                        <select id="userRole">
+                            <option value="admin" data-i18n="users.role_admin">管理员</option>
+                            <option value="user" data-i18n="users.role_user">用户</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="userActive" checked> <span
+                                data-i18n="users.enable_user">启用用户</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" id="cancelUserBtn" data-i18n="users.cancel">取消</button>
+                        <button type="submit" class="save-btn" data-i18n="users.save">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

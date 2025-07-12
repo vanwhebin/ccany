@@ -4,7 +4,6 @@
 
 A Claude Code proxy server rewritten in Go, providing a complete frontend and backend interface that supports converting Claude API requests to OpenAI API calls.
 
-![CCany](demo.png)
 
 ## Features
 
@@ -49,13 +48,17 @@ cp .env.example .env
 **Using published images:**
 
 ```bash
-# Using Docker Hub image
+# Using Docker Hub image with data persistence
 docker run -d -p 8082:8082 \
+  -v ccany_data:/app/data \
+  -v ccany_logs:/app/logs \
   -e OPENAI_API_KEY=your_openai_api_key \
   czyt/ccany:latest
 
-# Or using GitHub Container Registry image
+# Or using GitHub Container Registry image with data persistence
 docker run -d -p 8082:8082 \
+  -v ccany_data:/app/data \
+  -v ccany_logs:/app/logs \
   -e OPENAI_API_KEY=your_openai_api_key \
   ghcr.io/ca-x/ccany:latest
 ```

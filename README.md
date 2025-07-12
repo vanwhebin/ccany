@@ -4,8 +4,6 @@
 
 一个用Go语言重写的Claude Code代理服务器，提供完整的前后端界面，支持将Claude API请求转换为OpenAI API调用。
 
-![CCany](demo.png)
-
 ## 特性
 
 - **完整的Claude API兼容性**: 支持完整的 `/v1/messages` 端点
@@ -49,13 +47,17 @@ cp .env.example .env
 **使用发布的镜像：**
 
 ```bash
-# 使用Docker Hub镜像
+# 使用Docker Hub镜像，包含数据持久化
 docker run -d -p 8082:8082 \
+  -v ccany_data:/app/data \
+  -v ccany_logs:/app/logs \
   -e OPENAI_API_KEY=your_openai_api_key \
   czyt/ccany:latest
 
-# 或使用GitHub Container Registry镜像
+# 或使用GitHub Container Registry镜像，包含数据持久化
 docker run -d -p 8082:8082 \
+  -v ccany_data:/app/data \
+  -v ccany_logs:/app/logs \
   -e OPENAI_API_KEY=your_openai_api_key \
   ghcr.io/ca-x/ccany:latest
 ```

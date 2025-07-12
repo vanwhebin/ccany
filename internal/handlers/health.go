@@ -32,19 +32,31 @@ func NewHealthHandler(cfg *config.Config, configManager *app.ConfigManager, logg
 
 // Health handles GET /health
 func (h *HealthHandler) Health(c *gin.Context) {
-	// Get current configuration for accurate status
-	cfg, err := h.configManager.GetConfig()
-	if err != nil {
-		h.logger.WithError(err).Warn("Failed to get current config for health check, using static config")
-		cfg = h.config // fallback to static config
+	// Always return healthy for basic health check (for Docker health check)
+	response := gin.H{
+		"status":    "healthy",
+		"timestamp": time.Now().Format(time.RFC3339),
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":                "healthy",
-		"timestamp":             time.Now().Format(time.RFC3339),
-		"openai_api_configured": cfg.OpenAIAPIKey != "",
-		"api_key_valid":         cfg.ValidateAPIKey(),
-	})
+	// Try to get current configuration, but don't fail if unavailable
+	cfg, err := h.configManager.GetConfig()
+	if err != nil {
+		h.logger.WithError(err).Debug("Database not initialized or configuration unavailable")
+		// Add initialization status
+		response["initialized"] = false
+		response["message"] = "Service running but not yet initialized"
+		// Use static config as fallback for basic info
+		if h.config != nil {
+			response["openai_api_configured"] = h.config.OpenAIAPIKey != ""
+		}
+	} else {
+		// Database is available and initialized
+		response["initialized"] = true
+		response["openai_api_configured"] = cfg.OpenAIAPIKey != ""
+		response["api_key_valid"] = cfg.ValidateAPIKey()
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // TestConnection handles GET /test-connection

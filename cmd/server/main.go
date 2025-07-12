@@ -193,8 +193,8 @@ func main() {
 		c.Data(http.StatusOK, "image/x-icon", favicon)
 	})
 
-	// Decide which page to serve based on admin user existence
-	router.GET("/", func(c *gin.Context) {
+	// Create root handler function
+	rootHandler := func(c *gin.Context) {
 		// Check if admin user exists
 		adminExists, err := db.Client.User.Query().Where(user.Role("admin")).Exist(c.Request.Context())
 		if err != nil {
@@ -222,7 +222,10 @@ func main() {
 			}
 			c.Data(http.StatusOK, "text/html", setupHTML)
 		}
-	})
+	}
+
+	// Decide which page to serve based on admin user existence
+	router.GET("/", rootHandler)
 
 	// Provide direct access to setup page (check if admin exists)
 	router.GET("/setup", func(c *gin.Context) {
@@ -344,6 +347,7 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.EnhancedMessagesH
 
 	// Health and utility routes
 	router.GET("/health", healthHandler.Health)
+	router.HEAD("/health", healthHandler.Health)
 	router.GET("/test-connection", healthHandler.TestConnection)
 	router.GET("/api", healthHandler.Root) // API info endpoint
 	router.GET("/version", func(c *gin.Context) {

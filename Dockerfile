@@ -34,9 +34,9 @@ USER appuser
 # Expose port
 EXPOSE 8082
 
-# Health check - more tolerant for initialization period
+# Health check - only check /health endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8082/health || wget --no-verbose --tries=1 --spider http://localhost:8082/ || exit 1
+    CMD wget --no-verbose --tries=1 -O /dev/null http://localhost:8082/health || exit 1
 
 # Environment variables for Claude Code compatibility
 ENV CLAUDE_CODE_COMPATIBLE=true

@@ -28,7 +28,7 @@ ARG BUILD_TIME=unknown
 # Build the application with CGO disabled (pure Go SQLite)
 RUN CGO_ENABLED=0 GOOS=linux go build -a \
     -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
-    -o ccany cmd/server/main.go
+    -o ccany ./cmd/server
 
 # Runtime stage
 FROM alpine:latest

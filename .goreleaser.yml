@@ -42,6 +42,8 @@ dockers:
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-amd64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:{{ .Version }}-amd64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-amd64"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -61,6 +63,8 @@ dockers:
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-arm64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:{{ .Version }}-arm64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-arm64"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -75,6 +79,7 @@ dockers:
       - "--build-arg=BUILD_TIME={{.Date}}"
 
 docker_manifests:
+  # GitHub Container Registry manifests
   - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}"
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
@@ -83,6 +88,16 @@ docker_manifests:
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-amd64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-arm64"
+  
+  # Docker Hub manifests
+  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/ccany:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:{{ .Version }}-amd64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:{{ .Version }}-arm64"
+  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest"
+    image_templates:
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-amd64"
+      - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-arm64"
 
 snapshot:
   version_template: "{{ .Tag }}"

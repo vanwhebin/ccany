@@ -2,6 +2,7 @@ package claudecode
 
 import (
 	"strings"
+	"sync"
 
 	"ccany/internal/models"
 
@@ -10,6 +11,7 @@ import (
 
 // ModelRouter handles intelligent model routing based on request characteristics
 type ModelRouter struct {
+	mu               sync.RWMutex // Protects model configuration fields
 	logger           *logrus.Logger
 	bigModel         string
 	smallModel       string
@@ -30,14 +32,21 @@ func NewModelRouter(logger *logrus.Logger, bigModel, smallModel string) *ModelRo
 
 // RouteModel determines the appropriate model based on request characteristics
 func (r *ModelRouter) RouteModel(req *models.ClaudeMessagesRequest) string {
+	r.mu.RLock()
+	bigModel := r.bigModel
+	smallModel := r.smallModel
+	reasoningModel := r.reasoningModel
+	longContextModel := r.longContextModel
+	r.mu.RUnlock()
+
 	// Check for thinking mode
 	if req.Thinking {
 		r.logger.WithFields(logrus.Fields{
 			"original_model": req.Model,
-			"routed_model":   r.reasoningModel,
+			"routed_model":   reasoningModel,
 			"reason":         "thinking_mode",
 		}).Info("Routing to reasoning model for thinking mode")
-		return r.reasoningModel
+		return reasoningModel
 	}
 
 	// Check for model-specific routing
@@ -46,10 +55,10 @@ func (r *ModelRouter) RouteModel(req *models.ClaudeMessagesRequest) string {
 		// Route haiku to small model for background tasks
 		r.logger.WithFields(logrus.Fields{
 			"original_model": req.Model,
-			"routed_model":   r.smallModel,
+			"routed_model":   smallModel,
 			"reason":         "background_model",
 		}).Info("Routing haiku to background model")
-		return r.smallModel
+		return smallModel
 
 	case "claude-3-5-sonnet-20241022":
 		// Check token count for long context routing
@@ -57,25 +66,25 @@ func (r *ModelRouter) RouteModel(req *models.ClaudeMessagesRequest) string {
 		if tokenCount > 60000 {
 			r.logger.WithFields(logrus.Fields{
 				"original_model":   req.Model,
-				"routed_model":     r.longContextModel,
+				"routed_model":     longContextModel,
 				"estimated_tokens": tokenCount,
 				"reason":           "long_context",
 			}).Info("Routing to long context model")
-			return r.longContextModel
+			return longContextModel
 		}
-		return r.bigModel
+		return bigModel
 
 	default:
 		// Default routing based on complexity
 		if r.isComplexRequest(req) {
 			r.logger.WithFields(logrus.Fields{
 				"original_model": req.Model,
-				"routed_model":   r.bigModel,
+				"routed_model":   bigModel,
 				"reason":         "complex_request",
 			}).Info("Routing to big model for complex request")
-			return r.bigModel
+			return bigModel
 		}
-		return r.smallModel
+		return smallModel
 	}
 }
 
@@ -222,21 +231,27 @@ func (r *ModelRouter) hasComplexContent(content interface{}) bool {
 
 // GetModelCapabilities returns capabilities for different models
 func (r *ModelRouter) GetModelCapabilities() map[string]interface{} {
+	r.mu.RLock()
+	bigModel := r.bigModel
+	smallModel := r.smallModel
+	reasoningModel := r.reasoningModel
+	r.mu.RUnlock()
+
 	return map[string]interface{}{
 		"models": map[string]interface{}{
-			r.bigModel: map[string]interface{}{
+			bigModel: map[string]interface{}{
 				"max_tokens":     8192,
 				"supports_tools": true,
 				"supports_image": true,
 				"context_window": 200000,
 			},
-			r.smallModel: map[string]interface{}{
+			smallModel: map[string]interface{}{
 				"max_tokens":     4096,
 				"supports_tools": true,
 				"supports_image": true,
 				"context_window": 100000,
 			},
-			r.reasoningModel: map[string]interface{}{
+			reasoningModel: map[string]interface{}{
 				"max_tokens":        8192,
 				"supports_tools":    true,
 				"supports_image":    true,
@@ -256,13 +271,17 @@ func (r *ModelRouter) GetModelCapabilities() map[string]interface{} {
 
 // SetReasoningModel sets the reasoning model for thinking mode
 func (r *ModelRouter) SetReasoningModel(model string) {
+	r.mu.Lock()
 	r.reasoningModel = model
+	r.mu.Unlock()
 	r.logger.WithField("model", model).Info("Updated reasoning model")
 }
 
 // SetLongContextModel sets the long context model for high token count requests
 func (r *ModelRouter) SetLongContextModel(model string) {
+	r.mu.Lock()
 	r.longContextModel = model
+	r.mu.Unlock()
 	r.logger.WithField("model", model).Info("Updated long context model")
 }
 
@@ -283,8 +302,10 @@ func (r *ModelRouter) LogRoutingDecision(originalModel, routedModel, reason stri
 
 // UpdateModelConfiguration updates the model configuration dynamically
 func (r *ModelRouter) UpdateModelConfiguration(bigModel, smallModel string) {
+	r.mu.Lock()
 	r.bigModel = bigModel
 	r.smallModel = smallModel
+	r.mu.Unlock()
 	r.logger.WithFields(logrus.Fields{
 		"big_model":   bigModel,
 		"small_model": smallModel,

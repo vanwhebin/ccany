@@ -486,6 +486,9 @@ func (h *EnhancedMessagesHandler) CreateChatCompletion(c *gin.Context) {
 		"max_tokens": openaiReq.MaxTokens,
 	}).Info("Processing OpenAI chat completion request")
 
+	// Update model router with current configuration for consistent routing
+	h.modelRouter.UpdateModelConfiguration(cfg.BigModel, cfg.SmallModel)
+
 	// Use model mapping from configuration
 	switch openaiReq.Model {
 	case "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307":

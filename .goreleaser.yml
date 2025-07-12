@@ -98,6 +98,7 @@ docker_manifests:
     image_templates:
       - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-amd64"
       - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-arm64"
+snapshot:
   version_template: "{{ .Tag }}"
 
 changelog:

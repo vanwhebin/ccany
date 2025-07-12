@@ -46,9 +46,6 @@ dockers:
       - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-amd64"
     dockerfile: Dockerfile
     use: buildx
-    extra_files:
-      - go.mod
-      - go.sum
     build_flag_templates:
       - "--pull"
       - "--platform=linux/amd64"
@@ -70,9 +67,6 @@ dockers:
       - "{{ .Env.DOCKERHUB_USERNAME }}/ccany:latest-arm64"
     dockerfile: Dockerfile
     use: buildx
-    extra_files:
-      - go.mod
-      - go.sum
     build_flag_templates:
       - "--pull"
       - "--platform=linux/arm64"

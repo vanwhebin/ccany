@@ -1,36 +1,4 @@
 # Multi-stage build Dockerfile for CCany with pure Go SQLite
-
-# Build stage
-FROM golang:1.24-alpine AS builder
-
-# Set working directory
-WORKDIR /app
-
-# Install necessary packages
-RUN apk add --no-cache \
-    git \
-    ca-certificates \
-    tzdata
-
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY . .
-
-# Build arguments
-ARG VERSION=dev
-ARG BUILD_TIME=unknown
-
-# Build the application with CGO disabled (pure Go SQLite)
-RUN CGO_ENABLED=0 GOOS=linux go build -a \
-    -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
-    -o ccany ./cmd/server
-
-# Runtime stage
 FROM alpine:latest
 
 # Install runtime dependencies
@@ -50,8 +18,8 @@ RUN addgroup -g 1001 -S appgroup && \
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder /app/ccany .
+# Copy the binary from GoReleaser
+COPY ccany ./ccany
 
 # Create necessary directories with proper permissions
 RUN mkdir -p \

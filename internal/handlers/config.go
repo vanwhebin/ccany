@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"ccany/internal/app"
@@ -769,4 +770,88 @@ func (h *ConfigHandler) validateConfigValue(key, value string) error {
 		}
 	}
 	return nil
+}
+
+// GetFinalEndpointURL returns the final constructed endpoint URL - GET /admin/config/endpoint-url
+func (h *ConfigHandler) GetFinalEndpointURL(c *gin.Context) {
+	baseURL := c.Query("base_url")
+	if baseURL == "" {
+		// Get current config base URL if not provided
+		cfg, err := h.configManager.GetConfig()
+		if err != nil {
+			h.logger.WithError(err).Error("Failed to get current config")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to get current configuration",
+			})
+			return
+		}
+		baseURL = cfg.OpenAIBaseURL
+	}
+
+	// Use the same URL construction logic as the client
+	finalURL := constructFinalEndpointURL(baseURL)
+
+	c.JSON(http.StatusOK, gin.H{
+		"base_url":  baseURL,
+		"final_url": finalURL,
+		"endpoint":  "/chat/completions",
+		"construction": map[string]string{
+			"rule": "If base URL ends with '/' append 'v1', otherwise append '/v1'",
+		},
+	})
+}
+
+// constructFinalEndpointURL constructs the final endpoint URL using the same logic as the OpenAI client
+func constructFinalEndpointURL(baseURL string) string {
+	if baseURL == "" {
+		return "https://api.openai.com/v1/chat/completions"
+	}
+
+	// Handle trailing slash - always remove it
+	if strings.HasSuffix(baseURL, "/") {
+		baseURL = strings.TrimSuffix(baseURL, "/")
+	}
+
+	// Check if URL already contains /v1 - don't add another one
+	if strings.Contains(baseURL, "/v1") {
+		return baseURL + "/chat/completions"
+	}
+
+	// Parse the URL to analyze its structure
+	if shouldAppendV1ForHandler(baseURL) {
+		return baseURL + "/v1/chat/completions"
+	}
+
+	return baseURL + "/chat/completions"
+}
+
+// shouldAppendV1ForHandler determines if /v1 should be appended based on URL structure
+func shouldAppendV1ForHandler(baseURL string) bool {
+	// For standard OpenAI API format (api.openai.com), we should append /v1
+	if strings.Contains(strings.ToLower(baseURL), "api.openai.com") {
+		return true
+	}
+
+	// Extract the path part after the domain
+	parts := strings.Split(baseURL, "/")
+	if len(parts) < 4 { // protocol://domain only, no path
+		return true // Simple domain, likely needs /v1
+	}
+
+	// Count meaningful path segments (ignore empty strings)
+	pathSegments := 0
+	for i := 3; i < len(parts); i++ { // Start from index 3 to skip protocol://domain
+		if parts[i] != "" {
+			pathSegments++
+		}
+	}
+
+	// If URL has 2+ path segments (like /api/openrouter), it's likely a proxy service
+	// that has its own routing and doesn't need /v1
+	if pathSegments >= 2 {
+		return false
+	}
+
+	// Single path segment or simple domain - likely needs /v1
+	return true
 }

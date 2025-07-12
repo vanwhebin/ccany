@@ -337,6 +337,9 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.EnhancedMessagesH
 
 		// Claude Code specific routes
 		v1.GET("/models/capabilities", messagesHandler.GetModelCapabilities)
+
+		// Model testing route
+		v1.POST("/test/model", messagesHandler.TestOpenAIModel)
 	}
 
 	// Health and utility routes
@@ -393,6 +396,7 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.EnhancedMessagesH
 		admin.PUT("/config/:key", configHandler.UpdateConfig)
 		admin.POST("/config/test", configHandler.TestConfig)
 		admin.POST("/config/test-api-key", configHandler.TestAPIKey)
+		admin.GET("/config/endpoint-url", configHandler.GetFinalEndpointURL)
 
 		// Request logs management
 		admin.GET("/logs", requestLogsHandler.GetRequestLogs)

@@ -71,8 +71,8 @@
     "max_tokens_limit": "Max Tokens Limit",
     "max_tokens_limit_placeholder": "4096",
     "performance_config": "Performance Configuration",
-    "test_model": "🧪 Test",
-    "generate_random": "🎲 Generate",
+    "test_model": "Test",
+    "generate_random": "Generate",
     "anthropic_auth_token_hint": "Authentication token for accessing Claude API",
     "claude_config_desc": "Basic configuration settings for Claude API",
     "openai_compatible_config_desc": "Configure OpenAI compatible API service (supports OpenAI, Azure, local models, etc.)",
@@ -127,7 +127,8 @@
     "testing_api_key": "Testing API key...",
     "api_key_test_success": "✅ API key test successful!",
     "api_key_test_failed": "❌ API key test failed",
-    "network_error": "❌ Network error"
+    "network_error": "❌ Network error",
+    "final_endpoint": "Final Endpoint:"
   },
   "users": {
     "title": "User Management",
@@ -180,6 +181,7 @@
     "message_sent": "Message sent successfully!",
     "request_failed": "Request failed",
     "stream_test_success": "Stream response test successful!",
+    "stream_response_initiated": "Stream response initiated, check actual output stream",
     "input_tokens": "Input Tokens",
     "output_tokens": "Output Tokens",
     "response": "Response",
@@ -237,7 +239,39 @@
     "requests": "Request Logs",
     "config": "Configuration",
     "users": "User Management",
-    "test": "API Testing"
+    "test": "API Testing",
+    "help": "Help"
+  },
+  "help": {
+    "title": "Help",
+    "subtitle": "Learn how to use Claude Code with this service",
+    "step1_title": "1️⃣ Install Node.js",
+    "step1_desc": "Ensure Node.js version ≥ 18.0 (skip if already installed)",
+    "ubuntu_debian": "Ubuntu / Debian Users",
+    "macos_users": "macOS Users",
+    "step2_title": "2️⃣ Install Claude Code",
+    "install_claude": "Installation Command",
+    "step3_title": "3️⃣ Getting Started",
+    "auth_token_title": "Get Auth Token",
+    "auth_token_desc": "ANTHROPIC_AUTH_TOKEN: After registration, click Add Token on the API Tokens page to get it (starts with sk-)",
+    "auth_token_note": "Any name is fine, unlimited quota is recommended, keep other settings default",
+    "api_url_title": "API URL",
+    "api_url_desc": "ANTHROPIC_BASE_URL: {domain} is this site's API service address, same as the main site address",
+    "usage_commands": "Usage Commands",
+    "usage_note": "After configuring environment variables, use claude command directly to start",
+    "after_run_title": "After Running",
+    "step_theme": "Choose your preferred theme + Enter",
+    "step_security": "Confirm security notice + Enter",
+    "step_terminal": "Use default Terminal configuration + Enter",
+    "step_trust": "Trust working directory + Enter",
+    "start_coding": "Start coding with your AI programming partner in the terminal! 🚀",
+    "step4_title": "4️⃣ Configure Environment Variables (Recommended)",
+    "step4_desc": "To avoid repeated input, you can write environment variables to bash_profile and bashrc:",
+    "env_config": "Environment Variable Configuration",
+    "final_usage": "Final Usage",
+    "env_restart_note": "After restarting the terminal, you can directly use the above commands to use Claude Code",
+    "copied_success": "Copied to clipboard",
+    "copy_failed": "Copy failed, please manually select and copy"
   },
   "errors": {
     "internal_server_error": "Internal server error",
@@ -269,6 +303,13 @@
     "invalid_parameter": "Invalid parameter",
     "operation_failed": "Operation failed",
     "file_not_found": "File not found",
-    "permission_denied": "Permission denied"
+    "permission_denied": "Permission denied",
+    "access_denied_page": "Insufficient permissions to access this page",
+    "access_denied_config": "Insufficient permissions to modify configuration",
+    "access_denied_config_test": "Insufficient permissions to test configuration",
+    "access_denied_users": "Insufficient permissions to manage users",
+    "access_denied_user_save": "Insufficient permissions to save user",
+    "access_denied_user_edit": "Insufficient permissions to edit user",
+    "access_denied_user_delete": "Insufficient permissions to delete user"
   }
 }

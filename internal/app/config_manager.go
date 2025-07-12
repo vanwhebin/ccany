@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"ccany/internal/config"
 	"ccany/internal/database"
@@ -146,15 +145,7 @@ func (m *ConfigManager) ValidateConfig() error {
 		return fmt.Errorf("at least one API key (OpenAI or Claude) is required")
 	}
 
-	// Validate OpenAI API key format
-	if cfg.OpenAIAPIKey != "" && !strings.HasPrefix(cfg.OpenAIAPIKey, "sk-") {
-		return fmt.Errorf("invalid OpenAI API key format")
-	}
-
-	// Validate Claude API key format
-	if cfg.ClaudeAPIKey != "" && !strings.HasPrefix(cfg.ClaudeAPIKey, "sk-ant-") {
-		return fmt.Errorf("invalid Claude API key format")
-	}
+	// Skip API key format validation - allow any non-empty keys
 
 	// Validate port range
 	if cfg.Port < 1 || cfg.Port > 65535 {

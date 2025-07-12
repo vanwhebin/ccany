@@ -568,196 +568,19 @@ class ClaudeProxyApp {
 
     // Get fallback translations for critical UI elements
     getFallbackTranslations() {
+        // Minimal fallback translations - most translations should come from backend
         const fallbackTranslations = {
             'login': {
                 'title': this.currentLanguage === 'zh-CN' ? '管理员登录' : 'Admin Login',
-                'username': this.currentLanguage === 'zh-CN' ? '用户名' : 'Username',
-                'password': this.currentLanguage === 'zh-CN' ? '密码' : 'Password',
                 'login_button': this.currentLanguage === 'zh-CN' ? '登录' : 'Login',
-                'logging_in': this.currentLanguage === 'zh-CN' ? '登录中...' : 'Logging in...',
-                'logout': this.currentLanguage === 'zh-CN' ? '退出' : 'Logout',
-                'login_error': this.currentLanguage === 'zh-CN' ? '登录失败' : 'Login failed',
-                'login_success': this.currentLanguage === 'zh-CN' ? '登录成功' : 'Login successful',
                 'network_error': this.currentLanguage === 'zh-CN' ? '网络错误，请重试' : 'Network error, please try again'
-            },
-            'menu': {
-                'dashboard': this.currentLanguage === 'zh-CN' ? '仪表板' : 'Dashboard',
-                'requests': this.currentLanguage === 'zh-CN' ? '请求日志' : 'Request Logs',
-                'config': this.currentLanguage === 'zh-CN' ? '配置管理' : 'Configuration',
-                'users': this.currentLanguage === 'zh-CN' ? '用户管理' : 'User Management',
-                'test': this.currentLanguage === 'zh-CN' ? 'API测试' : 'API Testing'
-            },
-            'dashboard': {
-                'title': this.currentLanguage === 'zh-CN' ? '仪表板' : 'Dashboard',
-                'subtitle': this.currentLanguage === 'zh-CN' ? 'Claude Code Proxy 运行状态概览' : 'Claude Code Proxy Status Overview',
-                'total_requests': this.currentLanguage === 'zh-CN' ? '总请求数' : 'Total Requests',
-                'avg_response_time': this.currentLanguage === 'zh-CN' ? '平均响应时间' : 'Average Response Time',
-                'success_rate': this.currentLanguage === 'zh-CN' ? '成功率' : 'Success Rate',
-                'tokens_used': this.currentLanguage === 'zh-CN' ? 'Token使用量' : 'Tokens Used',
-                'system_info': this.currentLanguage === 'zh-CN' ? '系统信息' : 'System Information',
-                'version': this.currentLanguage === 'zh-CN' ? '版本' : 'Version',
-                'uptime': this.currentLanguage === 'zh-CN' ? '运行时间' : 'Uptime',
-                'current_model': this.currentLanguage === 'zh-CN' ? '当前模型' : 'Current Model',
-                'recent_requests': this.currentLanguage === 'zh-CN' ? '最近请求' : 'Recent Requests',
-                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
-                'service_normal': this.currentLanguage === 'zh-CN' ? '服务正常' : 'Service Normal',
-                'service_error': this.currentLanguage === 'zh-CN' ? '服务异常' : 'Service Error',
-                'connection_failed': this.currentLanguage === 'zh-CN' ? '连接失败' : 'Connection Failed'
-            },
-            'requests': {
-                'title': this.currentLanguage === 'zh-CN' ? '请求日志' : 'Request Logs',
-                'subtitle': this.currentLanguage === 'zh-CN' ? '查看所有API请求的详细记录' : 'View detailed records of all API requests',
-                'search_placeholder': this.currentLanguage === 'zh-CN' ? '搜索请求...' : 'Search requests...',
-                'refresh': this.currentLanguage === 'zh-CN' ? '刷新' : 'Refresh',
-                'time': this.currentLanguage === 'zh-CN' ? '时间' : 'Time',
-                'model': this.currentLanguage === 'zh-CN' ? '模型' : 'Model',
-                'status': this.currentLanguage === 'zh-CN' ? '状态' : 'Status',
-                'response_time': this.currentLanguage === 'zh-CN' ? '响应时间' : 'Response Time',
-                'token': this.currentLanguage === 'zh-CN' ? 'Token' : 'Token',
-                'actions': this.currentLanguage === 'zh-CN' ? '操作' : 'Actions',
-                'details': this.currentLanguage === 'zh-CN' ? '详情' : 'Details',
-                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
-                'success': this.currentLanguage === 'zh-CN' ? '成功' : 'Success',
-                'failed': this.currentLanguage === 'zh-CN' ? '失败' : 'Failed',
-                'warning': this.currentLanguage === 'zh-CN' ? '警告' : 'Warning'
-            },
-            'config': {
-                'title': this.currentLanguage === 'zh-CN' ? '配置管理' : 'Configuration',
-                'subtitle': this.currentLanguage === 'zh-CN' ? '管理代理服务器的配置参数' : 'Manage proxy server configuration parameters',
-                'api_config': this.currentLanguage === 'zh-CN' ? 'API配置' : 'API Configuration',
-                'openai_api_key': this.currentLanguage === 'zh-CN' ? 'OpenAI API Key' : 'OpenAI API Key',
-                'claude_api_key': this.currentLanguage === 'zh-CN' ? 'Claude API Key' : 'Claude API Key',
-                'openai_base_url': this.currentLanguage === 'zh-CN' ? 'OpenAI Base URL' : 'OpenAI Base URL',
-                'claude_base_url': this.currentLanguage === 'zh-CN' ? 'Claude Base URL' : 'Claude Base URL',
-                'openai_api_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入OpenAI API Key' : 'Enter OpenAI API Key',
-                'claude_api_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入Claude API Key' : 'Enter Claude API Key',
-                'openai_base_url_placeholder': this.currentLanguage === 'zh-CN' ? 'https://api.openai.com/v1' : 'https://api.openai.com/v1',
-                'claude_base_url_placeholder': this.currentLanguage === 'zh-CN' ? 'https://api.anthropic.com' : 'https://api.anthropic.com',
-                'test_api_key': this.currentLanguage === 'zh-CN' ? '🔍 测试API密钥' : '🔍 Test API Keys',
-                'model_config': this.currentLanguage === 'zh-CN' ? '模型配置' : 'Model Configuration',
-                'big_model': this.currentLanguage === 'zh-CN' ? '大模型 (Sonnet/Opus)' : 'Large Model (Sonnet/Opus)',
-                'small_model': this.currentLanguage === 'zh-CN' ? '小模型 (Haiku)' : 'Small Model (Haiku)',
-                'big_model_placeholder': this.currentLanguage === 'zh-CN' ? 'claude-3-5-sonnet-20241022' : 'claude-3-5-sonnet-20241022',
-                'small_model_placeholder': this.currentLanguage === 'zh-CN' ? 'claude-3-haiku-20240307' : 'claude-3-haiku-20240307',
-                'max_tokens': this.currentLanguage === 'zh-CN' ? '最大Token限制' : 'Max Tokens Limit',
-                'max_tokens_placeholder': this.currentLanguage === 'zh-CN' ? '4096' : '4096',
-                'request_timeout': this.currentLanguage === 'zh-CN' ? '请求超时 (秒)' : 'Request Timeout (seconds)',
-                'request_timeout_placeholder': this.currentLanguage === 'zh-CN' ? '90' : '90',
-                'server_config': this.currentLanguage === 'zh-CN' ? '服务器配置' : 'Server Configuration',
-                'server_host': this.currentLanguage === 'zh-CN' ? '服务器地址' : 'Server Host',
-                'server_port': this.currentLanguage === 'zh-CN' ? '服务器端口' : 'Server Port',
-                'server_host_placeholder': this.currentLanguage === 'zh-CN' ? '0.0.0.0' : '0.0.0.0',
-                'server_port_placeholder': this.currentLanguage === 'zh-CN' ? '8080' : '8080',
-                'log_level': this.currentLanguage === 'zh-CN' ? '日志级别' : 'Log Level',
-                'stream_enabled': this.currentLanguage === 'zh-CN' ? '启用流式响应' : 'Enable Streaming Response',
-                'security_config': this.currentLanguage === 'zh-CN' ? '安全配置' : 'Security Configuration',
-                'jwt_secret': this.currentLanguage === 'zh-CN' ? 'JWT密钥' : 'JWT Secret',
-                'db_encrypt_key': this.currentLanguage === 'zh-CN' ? '数据库加密密钥' : 'Database Encryption Key',
-                'jwt_secret_placeholder': this.currentLanguage === 'zh-CN' ? '输入JWT密钥' : 'Enter JWT Secret',
-                'db_encrypt_key_placeholder': this.currentLanguage === 'zh-CN' ? '输入数据库加密密钥' : 'Enter Database Encryption Key',
-                'encrypt_algo': this.currentLanguage === 'zh-CN' ? '配置加密算法' : 'Configuration Encryption Algorithm',
-                'test_config': this.currentLanguage === 'zh-CN' ? '测试配置' : 'Test Configuration',
-                'save_config': this.currentLanguage === 'zh-CN' ? '保存配置' : 'Save Configuration',
-                'saving': this.currentLanguage === 'zh-CN' ? '保存中...' : 'Saving...',
-                'config_saved': this.currentLanguage === 'zh-CN' ? '配置已保存' : 'Configuration Saved',
-                'save_failed': this.currentLanguage === 'zh-CN' ? '保存失败' : 'Save Failed',
-                'testing': this.currentLanguage === 'zh-CN' ? '测试中...' : 'Testing...',
-                'testing_config': this.currentLanguage === 'zh-CN' ? '正在测试配置...' : 'Testing configuration...',
-                'config_test_success': this.currentLanguage === 'zh-CN' ? '配置测试成功' : 'Configuration Test Successful',
-                'config_test_failed': this.currentLanguage === 'zh-CN' ? '配置测试失败' : 'Configuration Test Failed',
-                'testing_api_key': this.currentLanguage === 'zh-CN' ? '正在测试API密钥...' : 'Testing API keys...',
-                'api_key_test_success': this.currentLanguage === 'zh-CN' ? 'API密钥测试成功' : 'API Key Test Successful',
-                'api_key_test_failed': this.currentLanguage === 'zh-CN' ? 'API密钥测试失败' : 'API Key Test Failed',
-                'network_error': this.currentLanguage === 'zh-CN' ? '网络错误' : 'Network Error'
-            },
-            'users': {
-                'title': this.currentLanguage === 'zh-CN' ? '用户管理' : 'User Management',
-                'subtitle': this.currentLanguage === 'zh-CN' ? '管理系统用户和权限' : 'Manage system users and permissions',
-                'search_placeholder': this.currentLanguage === 'zh-CN' ? '搜索用户...' : 'Search users...',
-                'add_user': this.currentLanguage === 'zh-CN' ? '添加用户' : 'Add User',
-                'username': this.currentLanguage === 'zh-CN' ? '用户名' : 'Username',
-                'email': this.currentLanguage === 'zh-CN' ? '邮箱' : 'Email',
-                'password': this.currentLanguage === 'zh-CN' ? '密码' : 'Password',
-                'role': this.currentLanguage === 'zh-CN' ? '角色' : 'Role',
-                'status': this.currentLanguage === 'zh-CN' ? '状态' : 'Status',
-                'last_login': this.currentLanguage === 'zh-CN' ? '最后登录' : 'Last Login',
-                'actions': this.currentLanguage === 'zh-CN' ? '操作' : 'Actions',
-                'edit': this.currentLanguage === 'zh-CN' ? '编辑' : 'Edit',
-                'delete': this.currentLanguage === 'zh-CN' ? '删除' : 'Delete',
-                'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
-                'admin': this.currentLanguage === 'zh-CN' ? '管理员' : 'Admin',
-                'user': this.currentLanguage === 'zh-CN' ? '用户' : 'User',
-                'active': this.currentLanguage === 'zh-CN' ? '活跃' : 'Active',
-                'inactive': this.currentLanguage === 'zh-CN' ? '禁用' : 'Inactive',
-                'never_logged_in': this.currentLanguage === 'zh-CN' ? '从未登录' : 'Never logged in',
-                'role_admin': this.currentLanguage === 'zh-CN' ? '管理员' : 'Administrator',
-                'role_user': this.currentLanguage === 'zh-CN' ? '用户' : 'User',
-                'enable_user': this.currentLanguage === 'zh-CN' ? '启用用户' : 'Enable User',
-                'add_user_modal': this.currentLanguage === 'zh-CN' ? '添加用户' : 'Add User',
-                'edit_user_modal': this.currentLanguage === 'zh-CN' ? '编辑用户' : 'Edit User',
-                'cancel': this.currentLanguage === 'zh-CN' ? '取消' : 'Cancel',
-                'save': this.currentLanguage === 'zh-CN' ? '保存' : 'Save',
-                'user_saved': this.currentLanguage === 'zh-CN' ? '用户已保存' : 'User Saved',
-                'user_deleted': this.currentLanguage === 'zh-CN' ? '用户已删除' : 'User Deleted',
-                'confirm_delete': this.currentLanguage === 'zh-CN' ? '确定要删除此用户吗？' : 'Are you sure you want to delete this user?'
-            },
-            'test': {
-                'title': this.currentLanguage === 'zh-CN' ? 'API测试' : 'API Testing',
-                'subtitle': this.currentLanguage === 'zh-CN' ? '测试Claude API的功能和性能' : 'Test Claude API functionality and performance',
-                'connection_test': this.currentLanguage === 'zh-CN' ? '连接测试' : 'Connection Test',
-                'connection_test_desc': this.currentLanguage === 'zh-CN' ? '测试与OpenAI API的连接状态' : 'Test connection status with OpenAI API',
-                'test_connection': this.currentLanguage === 'zh-CN' ? '测试连接' : 'Test Connection',
-                'message_test': this.currentLanguage === 'zh-CN' ? '消息测试' : 'Message Test',
-                'select_model': this.currentLanguage === 'zh-CN' ? '选择模型' : 'Select Model',
-                'test_message': this.currentLanguage === 'zh-CN' ? '测试消息' : 'Test Message',
-                'test_message_placeholder': this.currentLanguage === 'zh-CN' ? '输入要测试的消息...' : 'Enter test message...',
-                'stream_response': this.currentLanguage === 'zh-CN' ? '流式响应' : 'Stream Response',
-                'send_test': this.currentLanguage === 'zh-CN' ? '发送测试' : 'Send Test',
-                'testing': this.currentLanguage === 'zh-CN' ? '测试中...' : 'Testing...',
-                'sending': this.currentLanguage === 'zh-CN' ? '发送中...' : 'Sending...',
-                'connection_success': this.currentLanguage === 'zh-CN' ? '连接测试成功' : 'Connection Test Successful',
-                'connection_failed': this.currentLanguage === 'zh-CN' ? '连接测试失败' : 'Connection Test Failed',
-                'message_sent': this.currentLanguage === 'zh-CN' ? '消息发送成功' : 'Message Sent Successfully',
-                'request_failed': this.currentLanguage === 'zh-CN' ? '请求失败' : 'Request Failed',
-                'stream_test_success': this.currentLanguage === 'zh-CN' ? '流式响应测试成功' : 'Stream Response Test Successful',
-                'model_used': this.currentLanguage === 'zh-CN' ? '使用模型' : 'Model Used',
-                'duration': this.currentLanguage === 'zh-CN' ? '耗时' : 'Duration',
-                'response_id': this.currentLanguage === 'zh-CN' ? '响应ID' : 'Response ID',
-                'response': this.currentLanguage === 'zh-CN' ? '响应' : 'Response',
-                'input_tokens': this.currentLanguage === 'zh-CN' ? '输入Token' : 'Input Tokens',
-                'output_tokens': this.currentLanguage === 'zh-CN' ? '输出Token' : 'Output Tokens',
-                'status_code': this.currentLanguage === 'zh-CN' ? '状态码' : 'Status Code',
-                'error': this.currentLanguage === 'zh-CN' ? '错误' : 'Error',
-                'check_network': this.currentLanguage === 'zh-CN' ? '请检查网络连接' : 'Please check network connection',
-                'check_config': this.currentLanguage === 'zh-CN' ? '请检查配置' : 'Please check configuration',
-                'suggestions': this.currentLanguage === 'zh-CN' ? '建议' : 'Suggestions'
             },
             'common': {
                 'loading': this.currentLanguage === 'zh-CN' ? '加载中...' : 'Loading...',
-                'error': this.currentLanguage === 'zh-CN' ? '错误' : 'Error',
-                'success': this.currentLanguage === 'zh-CN' ? '成功' : 'Success',
-                'network_error': this.currentLanguage === 'zh-CN' ? '网络错误，请重试' : 'Network error, please try again',
-                'loading_failed': this.currentLanguage === 'zh-CN' ? '加载失败' : 'Loading Failed',
-                'operation_failed': this.currentLanguage === 'zh-CN' ? '操作失败' : 'Operation Failed',
-                'unknown_error': this.currentLanguage === 'zh-CN' ? '未知错误' : 'Unknown Error'
-            },
-            'setup': {
-                'welcome': this.currentLanguage === 'zh-CN' ? '欢迎使用 CCany！让我们完成首次设置' : 'Welcome to CCany! Let\'s complete the initial setup',
-                'version': this.currentLanguage === 'zh-CN' ? '版本:' : 'Version:',
-                'build_time': this.currentLanguage === 'zh-CN' ? '构建时间:' : 'Build Time:',
-                'create_admin': this.currentLanguage === 'zh-CN' ? '创建管理员账户' : 'Create Administrator Account',
-                'admin_username': this.currentLanguage === 'zh-CN' ? '管理员用户名' : 'Administrator Username',
-                'admin_password': this.currentLanguage === 'zh-CN' ? '管理员密码' : 'Administrator Password',
-                'confirm_password': this.currentLanguage === 'zh-CN' ? '确认密码' : 'Confirm Password',
-                'password_requirements': this.currentLanguage === 'zh-CN' ? '密码至少6个字符，建议包含大小写字母、数字和特殊字符' : 'Password must be at least 6 characters, recommend including uppercase letters, lowercase letters, numbers and special characters',
-                'create_account': this.currentLanguage === 'zh-CN' ? '创建管理员账户' : 'Create Administrator Account',
-                'creating_account': this.currentLanguage === 'zh-CN' ? '正在创建管理员账户...' : 'Creating administrator account...',
-                'setup_complete': this.currentLanguage === 'zh-CN' ? '✅ 设置完成！' : '✅ Setup Complete!',
-                'account_created': this.currentLanguage === 'zh-CN' ? '管理员账户已创建成功。您现在可以登录到系统。' : 'Administrator account has been created successfully. You can now log in to the system.',
-                'go_to_login': this.currentLanguage === 'zh-CN' ? '前往登录' : 'Go to Login'
+                'error': this.currentLanguage === 'zh-CN' ? '错误' : 'Error'
             }
         };
-        console.log('Using fallback translations for language:', this.currentLanguage);
+        console.log('Using minimal fallback translations for language:', this.currentLanguage);
         return fallbackTranslations;
     }
 
@@ -1063,13 +886,20 @@ class ClaudeProxyApp {
                     jwtSecretInput.value = uuid;
                     
                     // Show a brief success indication
-                    const originalText = generateJwtBtn.textContent;
-                    generateJwtBtn.textContent = '✅ 已生成';
+                    const originalHtml = generateJwtBtn.innerHTML;
+                    generateJwtBtn.innerHTML = `
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                            <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m193.5 301.7l-210.6 292c-12.7 17.7-39 17.7-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z" fill="currentColor"></path>
+                        </svg>
+                        已生成
+                    `;
                     generateJwtBtn.style.background = 'var(--success-color)';
+                    generateJwtBtn.style.color = 'white';
                     
                     setTimeout(() => {
-                        generateJwtBtn.textContent = originalText;
+                        generateJwtBtn.innerHTML = originalHtml;
                         generateJwtBtn.style.background = '';
+                        generateJwtBtn.style.color = '';
                     }, 2000);
                 }
             });
@@ -1083,6 +913,14 @@ class ClaudeProxyApp {
         if (testApiKeyBtn) {
             testApiKeyBtn.addEventListener('click', () => this.testApiKey());
         }
+
+        // 模型测试按钮
+        document.querySelectorAll('.test-model-icon').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modelType = btn.dataset.model; // 'big' or 'small'
+                this.testModel(modelType);
+            });
+        });
 
         // 用户管理按钮
         const addUserBtn = document.getElementById('addUserBtn');
@@ -1135,6 +973,14 @@ class ClaudeProxyApp {
             });
         }
 
+        // OpenAI Base URL 输入框变化监听
+        const openaiBaseUrlInput = document.getElementById('openaiBaseUrl');
+        if (openaiBaseUrlInput) {
+            openaiBaseUrlInput.addEventListener('input', (e) => {
+                this.updateFinalEndpointURL(e.target.value);
+            });
+        }
+
         // 语言选择器将在showMainApp()中设置
     }
 
@@ -1173,7 +1019,7 @@ class ClaudeProxyApp {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         const loginError = document.getElementById('loginError');
-        const loginBtn = document.querySelector('.login-btn');
+        const loginBtn = document.querySelector('.login-form .btn-primary');
 
         // Enhanced loading state
         this.uiController.showLoadingState(loginBtn, this.t('login.logging_in'));
@@ -1266,9 +1112,22 @@ class ClaudeProxyApp {
         
         // Update user info display
         const userNameElement = document.getElementById('userName');
+        const userRoleElement = document.getElementById('userRole');
         if (userNameElement && this.currentUser) {
             userNameElement.textContent = this.currentUser.username;
+            // Generate and set user avatar
+            this.generateUserAvatar(this.currentUser.username);
         }
+        
+        if (userRoleElement && this.currentUser) {
+            const roleText = this.currentUser.role === 'admin' ? 
+                (this.t('users.admin') || '管理员') : 
+                (this.t('users.user') || '用户');
+            userRoleElement.textContent = roleText;
+        }
+
+        // Setup role-based UI permissions
+        this.setupRoleBasedUI();
 
         // Setup language selector after switching to main app
         this.setupLanguageSelector();
@@ -1304,7 +1163,76 @@ class ClaudeProxyApp {
         return response;
     }
 
+    // Setup role-based UI permissions
+    setupRoleBasedUI() {
+        if (!this.currentUser) return;
+
+        const isAdmin = this.currentUser.role === 'admin';
+        console.log('Setting up role-based UI for user:', this.currentUser.username, 'role:', this.currentUser.role, 'isAdmin:', isAdmin);
+
+        // Admin-only menu items
+        const adminOnlyTabs = ['config', 'users'];
+        
+        adminOnlyTabs.forEach(tabName => {
+            const menuItem = document.querySelector(`[data-tab="${tabName}"]`);
+            if (menuItem) {
+                if (isAdmin) {
+                    menuItem.style.display = '';
+                    menuItem.classList.remove('hidden');
+                } else {
+                    menuItem.style.display = 'none';
+                    menuItem.classList.add('hidden');
+                }
+            }
+        });
+
+        // If current user is not admin and currently on an admin tab, redirect to dashboard
+        if (!isAdmin && adminOnlyTabs.includes(this.currentTab)) {
+            this.switchTab('dashboard');
+        }
+
+        // Store user permission level for later checks
+        this.userPermissions = {
+            isAdmin: isAdmin,
+            canAccessConfig: isAdmin,
+            canAccessUsers: isAdmin,
+            canAccessDashboard: true,
+            canAccessRequests: true,
+            canAccessTest: true,
+            canAccessHelp: true
+        };
+    }
+
+    // Check if user has permission to access a specific tab
+    hasPermission(tabName) {
+        if (!this.userPermissions) return false;
+        
+        switch (tabName) {
+            case 'config':
+                return this.userPermissions.canAccessConfig;
+            case 'users':
+                return this.userPermissions.canAccessUsers;
+            case 'dashboard':
+                return this.userPermissions.canAccessDashboard;
+            case 'requests':
+                return this.userPermissions.canAccessRequests;
+            case 'test':
+                return this.userPermissions.canAccessTest;
+            case 'help':
+                return this.userPermissions.canAccessHelp;
+            default:
+                return false;
+        }
+    }
+
     switchTab(tabName) {
+        // Check permissions before switching tabs
+        if (!this.hasPermission(tabName)) {
+            console.warn(`Access denied to tab: ${tabName}`);
+            this.showNotification(this.t('errors.access_denied_page'), 'error');
+            return;
+        }
+
         // Prevent rapid tab switching
         if (this.debounceTimers.has('tabSwitch')) {
             clearTimeout(this.debounceTimers.get('tabSwitch'));
@@ -1358,10 +1286,17 @@ class ClaudeProxyApp {
                     this.loadRequestLogs();
                     break;
                 case 'config':
-                    this.loadConfig();
+                    if (this.hasPermission('config')) {
+                        this.loadConfig();
+                    }
                     break;
                 case 'users':
-                    this.loadUsers();
+                    if (this.hasPermission('users')) {
+                        this.loadUsers();
+                    }
+                    break;
+                case 'help':
+                    this.loadHelpPage();
                     break;
             }
         }, 100));
@@ -1450,6 +1385,9 @@ class ClaudeProxyApp {
         // 初始化Anthropic Base URL为当前页面URL
         this.initializeAnthropicBaseUrl();
 
+        // 更新最终端点URL显示
+        this.updateFinalEndpointURL(this.config.openai_base_url || '');
+
         // 更新仪表板中的当前模型
         const currentModelElement = document.getElementById('currentModel');
         if (currentModelElement) {
@@ -1458,6 +1396,12 @@ class ClaudeProxyApp {
     }
 
     async saveConfig() {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_config'), 'error');
+            return;
+        }
+
         const configData = {
             openai_api_key: document.getElementById('openaiApiKey').value,
             claude_api_key: document.getElementById('anthropicAuthToken').value,
@@ -1531,6 +1475,12 @@ class ClaudeProxyApp {
     }
 
     async testConfig() {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_config_test'), 'error');
+            return;
+        }
+
         const resultElement = document.getElementById('configResult');
         const testBtn = document.getElementById('testConfigBtn');
 
@@ -1686,6 +1636,12 @@ class ClaudeProxyApp {
     }
 
     showUserModal(user = null) {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_users'), 'error');
+            return;
+        }
+
         const modal = document.getElementById('userModal');
         const title = document.getElementById('userModalTitle');
         const form = document.getElementById('userForm');
@@ -1714,6 +1670,12 @@ class ClaudeProxyApp {
     }
 
     async handleUserSave() {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_user_save'), 'error');
+            return;
+        }
+
         const userId = document.getElementById('userId').value;
         const userData = {
             username: document.getElementById('userUsername').value,
@@ -1748,6 +1710,12 @@ class ClaudeProxyApp {
     }
 
     async editUser(userId) {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_user_edit'), 'error');
+            return;
+        }
+
         try {
             const response = await this.apiCall(`/admin/users/${userId}`);
             const data = await response.json();
@@ -1764,6 +1732,12 @@ class ClaudeProxyApp {
     }
 
     async deleteUser(userId) {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_user_delete'), 'error');
+            return;
+        }
+
         if (!confirm(this.t('users.confirm_delete'))) {
             return;
         }
@@ -2033,7 +2007,11 @@ class ClaudeProxyApp {
             if (response.ok) {
                 if (isStream) {
                     resultElement.className = 'test-result success';
-                    resultElement.innerHTML = `<strong>${this.t('test.stream_test_success')}</strong><br>${this.t('test.check_network')}`;
+                    resultElement.innerHTML = `
+                        <strong>${this.t('test.stream_test_success')}</strong><br>
+                        ${this.t('test.status_code')}: ${response.status}<br>
+                        ${this.t('test.stream_response_initiated')}
+                    `;
                 } else {
                     const data = await response.json();
                     resultElement.className = 'test-result success';
@@ -2062,6 +2040,64 @@ class ClaudeProxyApp {
         } finally {
             button.disabled = false;
             button.textContent = this.t('test.send_test');
+        }
+    }
+
+    async testModel(modelType) {
+        const modelInputId = modelType === 'big' ? 'bigModel' : 'smallModel';
+        const modelInput = document.getElementById(modelInputId);
+        const testIcon = document.querySelector(`.test-model-icon[data-model="${modelType}"]`);
+        
+        if (!modelInput || !modelInput.value.trim()) {
+            this.uiController.showEnhancedNotification(this.t('config.please_enter_model') || '请输入模型名称', 'error');
+            return;
+        }
+
+        const model = modelInput.value.trim();
+        const originalHtml = testIcon.innerHTML;
+        
+        // Show loading state - change icon to spinner
+        testIcon.style.pointerEvents = 'none';
+        testIcon.innerHTML = `
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="24" height="24" style="animation: spin 1s linear infinite;">
+                <path d="M512 1024c-69.1 0-136.2-13.5-199.3-40.2C251.7 958 194 911 151.7 849.3S80 704.4 80 640c0-29.9 13.7-56.9 37.2-75.5 23.5-18.6 54.4-24.7 83.1-16.4 28.7 8.3 52.4 28.5 63.7 54.4 11.3 25.9 9.3 55.4-5.4 79.2-5.2 8.4-12.2 15.5-20.4 20.8-16.4 10.6-35.6 14.6-54.4 11.1l13.2-44.7c5.2-1.1 10.3-2.9 14.9-5.4 4.6-2.5 8.6-5.7 11.9-9.5 8.6-9.8 12.2-23.1 9.6-35.8s-11.1-23.4-22.1-29.4c-11.1-6-24.3-6.9-35.6-2.4-11.3 4.5-20.3 13.1-24.4 23.6-4.1 10.5-3.5 22.1 1.6 31.8 5.1 9.7 13.4 17.7 23.1 22.2 9.7 4.5 20.6 5.4 30.8 2.6 10.2-2.8 19.1-8.9 25.1-17.1 6-8.2 9.1-18.1 8.7-28.1-0.4-10-4.5-19.5-11.4-26.9s-16.2-12.1-26.2-13.1c-10-1-20.3 1.4-28.6 6.8-8.3 5.4-14.1 13.4-16.1 22.4l-48.4-14.3c7.2-31.8 26.4-59.6 53.7-77.7 27.3-18.1 61.2-24.5 94.2-17.8 33 6.7 62.5 25.7 82.1 53.1 19.6 27.4 28.2 61.8 24 95.3-4.2 33.5-20.8 64.1-46.3 85.4-25.5 21.3-57.8 31.8-90.1 29.3-32.3-2.5-62.7-16.3-84.9-38.5-22.2-22.2-36-51.6-38.5-82.1-2.5-30.5 4.8-61.4 20.4-86.4 15.6-25 38.7-44.7 64.6-55.1 25.9-10.4 54.4-11.6 79.7-3.4 25.3 8.2 47.1 24.4 61 45.2 13.9 20.8 19.3 45.4 15.1 68.8-4.2 23.4-16.3 44.9-33.8 60.1-17.5 15.2-39.8 23.4-62.4 22.9-22.6-0.5-44.4-9.7-60.9-25.7-16.5-16-26.8-37.5-28.7-60.1-1.9-22.6 4.1-45.2 16.7-63.2 12.6-18 30.5-31.2 50.1-36.9 19.6-5.7 40.4-3.8 58.2 5.3 17.8 9.1 32.1 24.4 39.9 42.7 7.8 18.3 8.5 38.6 1.9 56.7-6.6 18.1-19.4 33.3-35.8 42.4-16.4 9.1-35.4 10.7-53.1 4.5l18.7-43.1c6.2 2.2 13.1 2.1 19.4-0.3 6.3-2.4 11.4-6.8 14.3-12.4 2.9-5.6 3.4-12.1 1.4-18.2-2-6.1-6.2-11.2-11.8-14.3-5.6-3.1-12.1-4-18.3-2.5-6.2 1.5-11.5 5.2-14.9 10.3-3.4 5.1-4.6 11.3-3.4 17.3 1.2 6 4.5 11.2 9.2 14.6 4.7 3.4 10.4 5 16.1 4.5 5.7-0.5 11-2.9 14.8-6.7 3.8-3.8 6.2-8.7 6.7-14.1 0.5-5.4-0.8-10.8-3.6-15.3-2.8-4.5-7-8-12-9.7-5-1.7-10.4-1.5-15.2 0.6-4.8 2.1-8.7 5.6-10.8 10.1-2.1 4.5-2.2 9.7-0.3 14.3 1.9 4.6 5.3 8.4 9.6 10.6 4.3 2.2 9.2 2.7 13.8 1.4 4.6-1.3 8.6-4.1 11.1-7.9 2.5-3.8 3.4-8.3 2.5-12.7-0.9-4.4-3.4-8.3-7-10.9-3.6-2.6-8.1-3.8-12.6-3.3-4.5 0.5-8.6 2.5-11.5 5.6-2.9 3.1-4.4 7.1-4.2 11.2 0.2 4.1 2 7.9 5 10.6 3 2.7 6.9 4.1 10.9 3.9 4-0.2 7.7-1.9 10.3-4.7 2.6-2.8 4-6.4 3.9-10.1-0.1-3.7-1.6-7.2-4.2-9.8-2.6-2.6-6.1-4.1-9.8-4.2-3.7-0.1-7.3 1.3-10.1 3.9s-4.5 6.3-4.7 10.3c-0.2 4 1.2 7.9 3.9 10.9 2.7 3 6.5 4.8 10.6 5 4.1 0.2 8.1-1.2 11.2-4.2 3.1-3 4.9-7.1 5.1-11.5 0.2-4.4-1.1-8.7-3.8-12.1-2.7-3.4-6.6-5.7-10.9-6.5-4.3-0.8-8.7 0.1-12.4 2.5-3.7 2.4-6.4 6-7.6 10.1-1.2 4.1-0.8 8.5 1.1 12.2 1.9 3.7 5.1 6.5 9 7.9 3.9 1.4 8.1 1.2 11.8-0.6 3.7-1.8 6.6-4.8 8.1-8.4 1.5-3.6 1.4-7.6 0-11.3-1.4-3.7-4.1-6.8-7.6-8.7-3.5-1.9-7.5-2.4-11.3-1.4-3.8 1-7.1 3.4-9.3 6.7-2.2 3.3-3.1 7.3-2.5 11.2 0.6 3.9 2.6 7.4 5.6 9.9 3 2.5 6.8 3.8 10.7 3.6 3.9-0.2 7.5-1.9 10.2-4.8 2.7-2.9 4.2-6.7 4.2-10.7 0-4-1.5-7.8-4.2-10.7-2.7-2.9-6.3-4.6-10.2-4.8-3.9-0.2-7.7 1.1-10.7 3.6-3 2.5-5 6-5.6 9.9-0.6 3.9 0.3 7.9 2.5 11.2 2.2 3.3 5.5 5.7 9.3 6.7 3.8 1 7.8 0.5 11.3-1.4 3.5-1.9 6.2-5 7.6-8.7 1.4-3.7 1.5-7.7 0-11.3-1.5-3.6-4.4-6.6-8.1-8.4-3.7-1.8-7.9-2-11.8-0.6-3.9 1.4-7.1 4.2-9 7.9-1.9 3.7-2.3 8.1-1.1 12.2 1.2 4.1 3.9 7.7 7.6 10.1 3.7 2.4 8.1 3.3 12.4 2.5 4.3-0.8 8.2-3.1 10.9-6.5 2.7-3.4 3.8-7.7 3.1-11.8-0.7-4.1-3.1-7.8-6.8-10.3-3.7-2.5-8.2-3.7-12.7-3.3-4.5 0.4-8.6 2.6-11.5 6.2-2.9 3.6-4.4 8.2-4.2 12.8 0.2 4.6 2.1 9 5.3 12.4 3.2 3.4 7.5 5.5 12.1 5.9 4.6 0.4 9.2-0.8 12.9-3.4 3.7-2.6 6.3-6.4 7.3-10.6 1-4.2 0.3-8.6-1.9-12.4-2.2-3.8-5.8-6.7-10.1-8.1-4.3-1.4-9-1.1-13.1 0.8-4.1 1.9-7.4 5.1-9.2 9.1-1.8 4-2.1 8.5-0.8 12.7 1.3 4.2 4.1 7.8 7.8 10.1 3.7 2.3 8.1 3.2 12.5 2.5 4.4-0.7 8.4-3 11.3-6.4 2.9-3.4 4.5-7.8 4.5-12.3 0-4.5-1.6-8.9-4.5-12.3-2.9-3.4-6.9-5.7-11.3-6.4-4.4-0.7-8.8 0.2-12.5 2.5-3.7 2.3-6.5 5.9-7.8 10.1-1.3 4.2-1 8.7 0.8 12.7 1.8 4 5.1 7.2 9.2 9.1 4.1 1.9 8.8 2.2 13.1 0.8 4.3-1.4 7.9-4.3 10.1-8.1 2.2-3.8 2.9-8.2 1.9-12.4-1-4.2-3.6-8-7.3-10.6-3.7-2.6-8.3-3.8-12.9-3.4-4.6 0.4-8.9 2.5-12.1 5.9-3.2 3.4-5.1 7.8-5.3 12.4-0.2 4.6 1.3 9.2 4.2 12.8 2.9 3.6 7 5.8 11.5 6.2 4.5 0.4 9-0.8 12.7-3.3 3.7-2.5 6.1-6.2 6.8-10.3 0.7-4.1-0.4-8.4-3.1-11.8-2.7-3.4-6.6-5.7-10.9-6.5-4.3-0.8-8.7 0.1-12.4 2.5-3.7 2.4-6.4 6-7.6 10.1-1.2 4.1-0.8 8.5 1.1 12.2 1.9 3.7 5.1 6.5 9 7.9 3.9 1.4 8.1 1.2 11.8-0.6 3.7-1.8 6.6-4.8 8.1-8.4 1.5-3.6 1.4-7.6 0-11.3-1.4-3.7-4.1-6.8-7.6-8.7-3.5-1.9-7.5-2.4-11.3-1.4-3.8 1-7.1 3.4-9.3 6.7-2.2 3.3-3.1 7.3-2.5 11.2 0.6 3.9 2.6 7.4 5.6 9.9 3 2.5 6.8 3.8 10.7 3.6 3.9-0.2 7.5-1.9 10.2-4.8 2.7-2.9 4.2-6.7 4.2-10.7 0-4-1.5-7.8-4.2-10.7-2.7-2.9-6.3-4.6-10.2-4.8-3.9-0.2-7.7 1.1-10.7 3.6-3 2.5-5 6-5.6 9.9-0.6 3.9 0.3 7.9 2.5 11.2 2.2 3.3 5.5 5.7 9.3 6.7 3.8 1 7.8 0.5 11.3-1.4 3.5-1.9 6.2-5 7.6-8.7 1.4-3.7 1.5-7.7 0-11.3-1.5-3.6-4.4-6.6-8.1-8.4-3.7-1.8-7.9-2-11.8-0.6-3.9 1.4-7.1 4.2-9 7.9-1.9 3.7-2.3 8.1-1.1 12.2 1.2 4.1 3.9 7.7 7.6 10.1 3.7 2.4 8.1 3.3 12.4 2.5 4.3-0.8 8.2-3.1 10.9-6.5 2.7-3.4 3.8-7.7 3.1-11.8-0.7-4.1-3.1-7.8-6.8-10.3-3.7-2.5-8.2-3.7-12.7-3.3-4.5 0.4-8.6 2.6-11.5 6.2-2.9 3.6-4.4 8.2-4.2 12.8 0.2 4.6 2.1 9 5.3 12.4 3.2 3.4 7.5 5.5 12.1 5.9 4.6 0.4 9.2-0.8 12.9-3.4 3.7-2.6 6.3-6.4 7.3-10.6 1-4.2 0.3-8.6-1.9-12.4-2.2-3.8-5.8-6.7-10.1-8.1-4.3-1.4-9-1.1-13.1 0.8-4.1 1.9-7.4 5.1-9.2 9.1-1.8 4-2.1 8.5-0.8 12.7 1.3 4.2 4.1 7.8 7.8 10.1 3.7 2.3 8.1 3.2 12.5 2.5 4.4-0.7 8.4-3 11.3-6.4 2.9-3.4 4.5-7.8 4.5-12.3 0-4.5-1.6-8.9-4.5-12.3-2.9-3.4-6.9-5.7-11.3-6.4-4.4-0.7-8.8 0.2-12.5 2.5z" fill="currentColor"></path>
+            </svg>
+        `;
+
+        try {
+            // Call the direct model test API
+            const response = await this.apiCall('/v1/test/model', {
+                method: 'POST',
+                body: JSON.stringify({
+                    model: model
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                this.uiController.showEnhancedNotification(
+                    `${this.t('config.model_test_success') || '模型测试成功'}: ${model}\n` +
+                    `${this.t('test.duration') || '耗时'}: ${data.duration}\n` +
+                    `${this.t('test.input_tokens') || '输入Token'}: ${data.input_tokens}\n` +
+                    `${this.t('test.output_tokens') || '输出Token'}: ${data.output_tokens}`, 
+                    'success'
+                );
+            } else {
+                this.uiController.showEnhancedNotification(
+                    `${this.t('config.model_test_failed') || '模型测试失败'}: ${data.message || data.error?.message || 'Unknown error'}`, 
+                    'error'
+                );
+            }
+        } catch (error) {
+            console.error('Model test failed:', error);
+            this.uiController.showEnhancedNotification(
+                `${this.t('config.model_test_failed') || '模型测试失败'}: ${error.message}`, 
+                'error'
+            );
+        } finally {
+            testIcon.style.pointerEvents = '';
+            testIcon.innerHTML = originalHtml;
         }
     }
 
@@ -2145,7 +2181,12 @@ class ClaudeProxyApp {
                 <div class="loading-overlay">
                     <div class="loading-container">
                         <div class="loading-logo">
-                            <div class="logo-icon animate-pulse">🤖</div>
+                            <div class="logo-icon animate-pulse">
+                                <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+                                    <path d="M512 512m-512 0a512 512 0 1 0 1024 0 512 512 0 1 0-1024 0Z" fill="#D97757"></path>
+                                    <path d="M278.698667 638.592l151.04-84.736 2.56-7.381333-2.56-4.053334H422.4l-25.258667-1.578666-86.314666-2.304-74.88-3.114667-72.533334-3.882667-18.261333-3.882666L128 505.088l1.749333-11.264 15.36-10.282667 21.973334 1.92 48.64 3.328 72.874666 5.034667 52.906667 3.114667 78.336 8.149333h12.458667l1.706666-5.034667-4.266666-3.114666-3.285334-3.114667-75.434666-51.072L269.354667 388.693333 226.56 357.632l-23.125333-15.744-11.648-14.762667-5.077334-32.256 20.992-23.082666 28.202667 1.92 7.210667 1.962666 28.586666 21.930667 61.013334 47.232 79.744 58.666667 11.648 9.728 4.693333-3.328 0.554667-2.346667-5.248-8.704-43.349334-78.293333L334.506667 240.896l-20.608-33.066667-5.418667-19.797333a95.018667 95.018667 0 0 1-3.328-23.296l23.893333-32.426667 13.226667-4.309333 31.914667 4.266667 13.44 11.648 19.797333 45.269333 32.085333 71.296 49.792 96.981333 14.592 28.757334 7.765334 26.581333 2.901333 8.192h5.077333v-4.693333l4.053334-54.613334 7.594666-66.986666 7.381334-86.272 2.56-24.277334 12.032-29.141333 23.893333-15.744 18.688 8.96 15.36 21.930667-2.133333 14.208-9.130667 59.221333-17.92 92.885333-11.648 62.165334h6.826667l7.765333-7.765334 31.488-41.813333 52.906667-66.005333 23.296-26.24 27.221333-28.928 17.493333-13.824h33.066667l24.32 36.138666-10.88 37.290667-34.048 43.136-28.16 36.522667-40.448 54.4-25.301333 43.52 2.346666 3.498666 6.016-0.554666 91.392-19.456 49.365334-8.96 58.922666-10.069334 26.624 12.416 2.944 12.629334-10.496 25.856-63.018666 15.530666-73.856 14.762667-110.08 26.026667-1.365334 0.981333 1.578667 1.962667 49.578667 4.693333 21.205333 1.109333h51.882667l96.64 7.210667 25.301333 16.725333 15.146667 20.394667-2.56 15.530667-38.826667 19.797333-52.522667-12.416-122.453333-29.141333-42.026667-10.496h-5.845333v3.498666l34.986667 34.176 64.170666 57.898667 80.298667 74.624 4.096 18.474667-10.325333 14.549333-10.88-1.536-70.570667-53.034667-27.221333-23.893333-61.653334-51.882667h-4.053333v5.418667l14.165333 20.778667 75.093334 112.682666 3.84 34.56-5.418667 11.306667-19.456 6.826667-21.376-3.925334-43.946667-61.568-45.312-69.376-36.522666-62.165333-4.48 2.56-21.589334 232.106667-10.112 11.904-23.338666 8.917333-19.456-14.762667-10.282667-23.893333 10.282667-47.232 12.458666-61.568 10.112-48.981333 9.130667-60.8 5.461333-20.181334-0.426666-1.365333-4.437334 0.554667-45.866666 62.976-69.802667 94.208-55.253333 59.050666-13.226667 5.248-22.912-11.818666 2.133333-21.205334 12.8-18.816 76.458667-97.152 46.08-60.245333 29.738667-34.773333-0.213334-5.034667h-1.706666L260.181333 721.92l-36.181333 4.693333-15.530667-14.592 1.92-23.893333 7.381334-7.765333 61.056-41.984-0.170667 0.213333z" fill="#FFFFFF"></path>
+                                </svg>
+                            </div>
                             <h2 class="logo-text">CCany</h2>
                         </div>
                         <div class="loading-spinner-container">
@@ -2338,6 +2379,212 @@ class ClaudeProxyApp {
                 anthropicBaseUrlInput.value = baseUrl;
             }
         }
+    }
+
+    // Construct final endpoint URL using universal logic
+    constructFinalURL(baseURL) {
+        if (!baseURL || baseURL.trim() === '') {
+            return 'https://api.openai.com/v1/chat/completions';
+        }
+
+        // Handle trailing slash - always remove it
+        if (baseURL.endsWith('/')) {
+            baseURL = baseURL.slice(0, -1);
+        }
+
+        // Check if URL already contains /v1 - don't add another one
+        if (baseURL.includes('/v1')) {
+            return baseURL + '/chat/completions';
+        }
+
+        // Parse the URL to analyze its structure
+        if (this.shouldAppendV1(baseURL)) {
+            return baseURL + '/v1/chat/completions';
+        }
+        
+        return baseURL + '/chat/completions';
+    }
+
+    // Determine if /v1 should be appended based on URL structure
+    shouldAppendV1(baseURL) {
+        // For standard OpenAI API format (api.openai.com), we should append /v1
+        if (baseURL.toLowerCase().includes('api.openai.com')) {
+            return true;
+        }
+        
+        // Extract the path part after the domain
+        const parts = baseURL.split('/');
+        if (parts.length < 4) { // protocol://domain only, no path
+            return true; // Simple domain, likely needs /v1
+        }
+        
+        // Count meaningful path segments (ignore empty strings)
+        let pathSegments = 0;
+        for (let i = 3; i < parts.length; i++) { // Start from index 3 to skip protocol://domain
+            if (parts[i] !== '') {
+                pathSegments++;
+            }
+        }
+        
+        // If URL has 2+ path segments (like /api/openrouter), it's likely a proxy service
+        // that has its own routing and doesn't need /v1
+        if (pathSegments >= 2) {
+            return false;
+        }
+        
+        // Single path segment or simple domain - likely needs /v1
+        return true;
+    }
+
+    // Update the final endpoint URL display
+    updateFinalEndpointURL(baseURL) {
+        const endpointUrlElement = document.getElementById('openaiEndpointUrl');
+        if (endpointUrlElement) {
+            const finalURL = this.constructFinalURL(baseURL);
+            endpointUrlElement.textContent = finalURL;
+        }
+    }
+
+    // Load help page and setup functionality
+    loadHelpPage() {
+        // Update current domain in help content
+        this.updateHelpPageDomains();
+        // Setup copy button functionality
+        this.setupCopyButtons();
+    }
+
+    // Update domain references in help page
+    updateHelpPageDomains() {
+        const currentDomain = window.location.origin;
+        
+        // Update domain display
+        const domainElement = document.getElementById('currentDomain');
+        if (domainElement) {
+            domainElement.textContent = currentDomain;
+        }
+
+        // Get real token from config if available
+        let realToken = 'sk-...';
+        if (this.config && this.config.claude_api_key) {
+            realToken = this.config.claude_api_key;
+        } else if (this.config && this.config.anthropic_auth_token) {
+            realToken = this.config.anthropic_auth_token;
+        }
+
+        // Update usage commands with current domain and real token
+        const usageCommands = document.getElementById('usageCommands');
+        if (usageCommands) {
+            usageCommands.textContent = `export ANTHROPIC_AUTH_TOKEN=${realToken} 
+export ANTHROPIC_BASE_URL=${currentDomain}
+claude`;
+        }
+
+        // Update usage commands copy button
+        const usageCommandsCopy = document.getElementById('usageCommandsCopy');
+        if (usageCommandsCopy) {
+            usageCommandsCopy.dataset.copy = `export ANTHROPIC_AUTH_TOKEN=${realToken} 
+export ANTHROPIC_BASE_URL=${currentDomain}
+claude`;
+        }
+
+        // Update environment commands with current domain and real token
+        const envCommands = document.getElementById('envCommands');
+        if (envCommands) {
+            envCommands.textContent = `echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.bash_profile
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.bash_profile
+echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.bashrc
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.bashrc
+echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.zshrc
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.zshrc`;
+        }
+
+        // Update environment commands copy button
+        const envCommandsCopy = document.getElementById('envCommandsCopy');
+        if (envCommandsCopy) {
+            envCommandsCopy.dataset.copy = `echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.bash_profile
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.bash_profile
+echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.bashrc
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.bashrc
+echo -e '\\n export ANTHROPIC_AUTH_TOKEN=${realToken}' >> ~/.zshrc
+echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.zshrc`;
+        }
+    }
+
+    // Setup copy button functionality
+    setupCopyButtons() {
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            // Remove existing event listeners
+            btn.replaceWith(btn.cloneNode(true));
+        });
+
+        // Re-attach event listeners
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const textToCopy = btn.dataset.copy;
+                if (textToCopy) {
+                    try {
+                        await navigator.clipboard.writeText(textToCopy);
+                        
+                        // Show success feedback
+                        const originalContent = btn.innerHTML;
+                        btn.innerHTML = `
+                            <svg viewBox="0 0 24 24" width="16" height="16">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+                            </svg>
+                        `;
+                        btn.classList.add('copied');
+                        
+                        setTimeout(() => {
+                            btn.innerHTML = originalContent;
+                            btn.classList.remove('copied');
+                        }, 2000);
+                        
+                        // Show notification
+                        this.uiController.showEnhancedNotification(
+                            this.t('help.copied_success') || '已复制到剪贴板', 
+                            'success'
+                        );
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                        this.uiController.showEnhancedNotification(
+                            this.t('help.copy_failed') || '复制失败，请手动选择复制', 
+                            'error'
+                        );
+                    }
+                }
+            });
+        });
+    }
+
+    // Generate user avatar based on username
+    generateUserAvatar(username) {
+        const avatarElement = document.getElementById('userAvatar');
+        if (!avatarElement || !username) return;
+
+        // Generate initials from username (take first 2 characters)
+        const initials = username.slice(0, 2).toUpperCase();
+        
+        // Generate a consistent color based on username hash
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7DBDD'
+        ];
+        
+        // Simple hash function to get consistent color
+        let hash = 0;
+        for (let i = 0; i < username.length; i++) {
+            hash = username.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const colorIndex = Math.abs(hash) % colors.length;
+        const backgroundColor = colors[colorIndex];
+        
+        // Set avatar content and style
+        avatarElement.textContent = initials;
+        avatarElement.style.backgroundColor = backgroundColor;
+        
+        // Add a subtle glow effect matching the background color
+        avatarElement.style.boxShadow = `0 2px 8px ${backgroundColor}30, 0 0 0 2px ${backgroundColor}20`;
     }
 }
 

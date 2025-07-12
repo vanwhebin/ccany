@@ -71,8 +71,8 @@
     "max_tokens_limit": "最大Token限制",
     "max_tokens_limit_placeholder": "4096",
     "performance_config": "性能配置",
-    "test_model": "🧪 测试",
-    "generate_random": "🎲 生成",
+    "test_model": "测试",
+    "generate_random": "生成",
     "anthropic_auth_token_hint": "用于访问Claude API的认证令牌",
     "claude_config_desc": "Claude API的基本配置设置",
     "openai_compatible_config_desc": "配置OpenAI兼容的API服务（支持OpenAI、Azure、本地模型等）",
@@ -127,7 +127,8 @@
     "testing_api_key": "正在测试API密钥...",
     "api_key_test_success": "✅ API密钥测试成功！",
     "api_key_test_failed": "❌ API密钥测试失败",
-    "network_error": "❌ 网络错误"
+    "network_error": "❌ 网络错误",
+    "final_endpoint": "最终端点："
   },
   "users": {
     "title": "用户管理",
@@ -180,6 +181,7 @@
     "message_sent": "消息发送成功！",
     "request_failed": "请求失败",
     "stream_test_success": "流式响应测试成功！",
+    "stream_response_initiated": "流式响应已启动，请查看实际输出流",
     "input_tokens": "输入Token",
     "output_tokens": "输出Token",
     "response": "响应",
@@ -237,7 +239,39 @@
     "requests": "请求日志",
     "config": "配置管理",
     "users": "用户管理",
-    "test": "API测试"
+    "test": "API测试",
+    "help": "使用帮助"
+  },
+  "help": {
+    "title": "使用帮助",
+    "subtitle": "了解如何使用Claude Code与本服务",
+    "step1_title": "1️⃣ 安装 Node.js",
+    "step1_desc": "确保 Node.js 版本 ≥ 18.0（已安装可跳过）",
+    "ubuntu_debian": "Ubuntu / Debian 用户",
+    "macos_users": "macOS 用户",
+    "step2_title": "2️⃣ 安装 Claude Code",
+    "install_claude": "安装命令",
+    "step3_title": "3️⃣ 开始使用",
+    "auth_token_title": "获取 Auth Token",
+    "auth_token_desc": "ANTHROPIC_AUTH_TOKEN：注册后在 API令牌 页面点击 添加令牌 获得（以 sk- 开头）",
+    "auth_token_note": "名称随意，额度建议设为无限额度，其他保持默认设置即可",
+    "api_url_title": "API地址",
+    "api_url_desc": "ANTHROPIC_BASE_URL：{domain} 是本站的 API 服务地址，与主站地址相同",
+    "usage_commands": "使用命令",
+    "usage_note": "配置环境变量后，直接使用claude命令即可启动",
+    "after_run_title": "运行后",
+    "step_theme": "选择你喜欢的主题 + Enter",
+    "step_security": "确认安全须知 + Enter",
+    "step_terminal": "使用默认 Terminal 配置 + Enter",
+    "step_trust": "信任工作目录 + Enter",
+    "start_coding": "开始在终端里和你的 AI 编程搭档一起写代码吧！🚀",
+    "step4_title": "4️⃣ 配置环境变量（推荐）",
+    "step4_desc": "为避免每次重复输入，可将环境变量写入 bash_profile 和 bashrc：",
+    "env_config": "环境变量配置",
+    "final_usage": "最终使用",
+    "env_restart_note": "重启终端后，直接使用上述命令即可使用 Claude Code",
+    "copied_success": "已复制到剪贴板",
+    "copy_failed": "复制失败，请手动选择复制"
   },
   "errors": {
     "internal_server_error": "内部服务器错误",
@@ -269,6 +303,13 @@
     "invalid_parameter": "无效参数",
     "operation_failed": "操作失败",
     "file_not_found": "文件未找到",
-    "permission_denied": "权限被拒绝"
+    "permission_denied": "权限被拒绝",
+    "access_denied_page": "权限不足，无法访问此页面",
+    "access_denied_config": "权限不足，无法修改配置",
+    "access_denied_config_test": "权限不足，无法测试配置",
+    "access_denied_users": "权限不足，无法管理用户",
+    "access_denied_user_save": "权限不足，无法保存用户",
+    "access_denied_user_edit": "权限不足，无法编辑用户",
+    "access_denied_user_delete": "权限不足，无法删除用户"
   }
 }

@@ -11,7 +11,7 @@ import (
 	"ccany/ent"
 	"ccany/internal/crypto"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib-x/entsqlite"
 )
 
 // Database manager
@@ -89,7 +89,7 @@ func createClient(cfg *Config) (*ent.Client, error) {
 		}
 
 		dbPath := filepath.Join(cfg.DataPath, cfg.Database)
-		dsn = fmt.Sprintf("file:%s?cache=shared&_fk=1", dbPath)
+		dsn = fmt.Sprintf("file:%s?cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(10000)", dbPath)
 		driver = "sqlite3"
 
 	case "mysql":

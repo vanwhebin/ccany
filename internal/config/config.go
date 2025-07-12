@@ -1,9 +1,5 @@
 package config
 
-import (
-	"strings"
-)
-
 // Config holds all configuration for the application
 type Config struct {
 	// OpenAI API Configuration
@@ -41,9 +37,6 @@ func (c *Config) ValidateAPIKey() bool {
 	if c.OpenAIAPIKey == "" {
 		return false
 	}
-	// Basic format check for OpenAI API keys
-	if !strings.HasPrefix(c.OpenAIAPIKey, "sk-") {
-		return false
-	}
+	// Skip format check - allow any non-empty API key
 	return true
 }

@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"ccany/internal/client"
@@ -12,6 +14,7 @@ import (
 	"ccany/internal/converter"
 	"ccany/internal/logging"
 	"ccany/internal/models"
+	"ccany/internal/session"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,19 +23,21 @@ import (
 
 // MessagesHandler handles Claude messages API requests
 type MessagesHandler struct {
-	config        *config.Config
-	openaiClient  *client.OpenAIClient
-	requestLogger *logging.RequestLogger
-	logger        *logrus.Logger
+	config         *config.Config
+	openaiClient   *client.OpenAIClient
+	requestLogger  *logging.RequestLogger
+	logger         *logrus.Logger
+	sessionManager *session.SessionManager
 }
 
 // NewMessagesHandler creates a new messages handler
-func NewMessagesHandler(cfg *config.Config, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger) *MessagesHandler {
+func NewMessagesHandler(cfg *config.Config, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger, sessionManager *session.SessionManager) *MessagesHandler {
 	return &MessagesHandler{
-		config:        cfg,
-		openaiClient:  openaiClient,
-		requestLogger: requestLogger,
-		logger:        logger,
+		config:         cfg,
+		openaiClient:   openaiClient,
+		requestLogger:  requestLogger,
+		logger:         logger,
+		sessionManager: sessionManager,
 	}
 }
 
@@ -54,8 +59,56 @@ func (h *MessagesHandler) CreateMessage(c *gin.Context) {
 		"max_tokens": claudeReq.MaxTokens,
 	}).Info("Processing Claude messages request")
 
+	// Extract session context from headers or request
+	projectPath := c.GetHeader("X-Claude-Project-Path")
+	userID := c.GetHeader("X-Claude-User-ID")
+	if projectPath == "" {
+		projectPath = "default"
+	}
+	if userID == "" {
+		userID = "anonymous"
+	}
+
+	// Get or create session for conversation context
+	var allMessages []models.ClaudeMessage
+	if h.sessionManager != nil {
+		session, err := h.sessionManager.GetOrCreateSession(projectPath, userID, claudeReq.System)
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to get session, proceeding without context")
+			allMessages = claudeReq.Messages
+		} else {
+			// Get previous messages from session
+			sessionMessages, systemPrompt, err := h.sessionManager.GetSessionMessages(session.ID)
+			if err != nil {
+				h.logger.WithError(err).Warn("Failed to get session messages")
+				allMessages = claudeReq.Messages
+			} else {
+				// Combine session messages with new message
+				allMessages = append(sessionMessages, claudeReq.Messages...)
+
+				// Use system prompt from session if not provided in request
+				if claudeReq.System == nil && systemPrompt != nil {
+					claudeReq.System = systemPrompt
+				}
+
+				h.logger.WithFields(logrus.Fields{
+					"session_id":        session.ID,
+					"previous_messages": len(sessionMessages),
+					"new_messages":      len(claudeReq.Messages),
+					"total_messages":    len(allMessages),
+				}).Debug("Using conversation context from session")
+			}
+		}
+	} else {
+		allMessages = claudeReq.Messages
+	}
+
+	// Create modified request with full conversation history
+	fullReq := claudeReq
+	fullReq.Messages = allMessages
+
 	// Convert Claude request to OpenAI format
-	openaiReq, err := converter.ConvertClaudeToOpenAI(&claudeReq, h.config.BigModel, h.config.SmallModel)
+	openaiReq, err := converter.ConvertClaudeToOpenAI(&fullReq, h.config.BigModel, h.config.SmallModel)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to convert request")
 		c.JSON(http.StatusBadRequest, converter.CreateClaudeErrorResponse("invalid_request_error", "Failed to convert request"))
@@ -66,14 +119,14 @@ func (h *MessagesHandler) CreateMessage(c *gin.Context) {
 	defer cancel()
 
 	if claudeReq.Stream {
-		h.handleStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq)
+		h.handleStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq, projectPath, userID)
 	} else {
-		h.handleNonStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq)
+		h.handleNonStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq, projectPath, userID)
 	}
 }
 
 // handleNonStreamingRequest handles non-streaming requests
-func (h *MessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *MessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest, projectPath, userID string) {
 	startTime := time.Now()
 
 	// Send request to OpenAI
@@ -179,10 +232,31 @@ func (h *MessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx context.
 	}
 
 	c.JSON(http.StatusOK, claudeResp)
+
+	// Save messages to session for context
+	if h.sessionManager != nil {
+		sessionID := h.generateSessionID(projectPath, userID)
+
+		// Add user messages to session
+		for _, msg := range claudeReq.Messages {
+			if err := h.sessionManager.AddMessage(sessionID, msg, claudeResp.Usage.InputTokens/len(claudeReq.Messages)); err != nil {
+				h.logger.WithError(err).Warn("Failed to add user message to session")
+			}
+		}
+
+		// Add assistant response to session
+		assistantMsg := models.ClaudeMessage{
+			Role:    "assistant",
+			Content: claudeResp.Content,
+		}
+		if err := h.sessionManager.AddMessage(sessionID, assistantMsg, claudeResp.Usage.OutputTokens); err != nil {
+			h.logger.WithError(err).Warn("Failed to add assistant message to session")
+		}
+	}
 }
 
 // handleStreamingRequest handles streaming requests
-func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest, projectPath, userID string) {
 	startTime := time.Now()
 
 	// Set SSE headers
@@ -191,6 +265,7 @@ func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Con
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Access-Control-Allow-Headers", "*")
+	c.Header("X-Accel-Buffering", "no") // Disable nginx buffering
 
 	// Get streaming response from OpenAI
 	streamChan, err := h.openaiClient.CreateChatCompletionStream(ctx, openaiReq)
@@ -229,9 +304,17 @@ func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Con
 	startEvent := converter.CreateClaudeStreamStartEvent(requestID, claudeReq.Model)
 	h.writeSSEEvent(c, "message_start", startEvent)
 
+	// Send ping event
+	pingEvent := converter.CreateClaudeStreamPingEvent()
+	h.writeSSEEvent(c, "ping", pingEvent)
+
+	// Create streaming context for proper Claude format
+	streamCtx := converter.CreateStreamingContext(requestID, claudeReq.Model, 0) // TODO: Calculate input tokens
+
 	var totalInputTokens, totalOutputTokens int
 	hasError := false
 	var streamError error
+	var responseContent strings.Builder
 
 	// Process stream chunks
 	for chunk := range streamChan {
@@ -258,7 +341,7 @@ func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Con
 
 		if chunk.Data != nil {
 			// Convert OpenAI stream chunk to Claude events
-			events, err := converter.ConvertOpenAIStreamToClaudeStream(chunk.Data, claudeReq)
+			events, err := converter.ConvertOpenAIStreamToClaudeStream(chunk.Data, claudeReq, streamCtx)
 			if err != nil {
 				h.logger.WithError(err).Warn("Failed to convert stream chunk")
 				continue
@@ -267,18 +350,33 @@ func (h *MessagesHandler) handleStreamingRequest(c *gin.Context, ctx context.Con
 			// Send each event
 			for _, event := range events {
 				h.writeSSEEvent(c, event.Type, event)
+
+				// Collect content for session storage
+				if event.Delta != nil && event.Delta.Text != "" {
+					responseContent.WriteString(event.Delta.Text)
+				}
 			}
+
+			// Update token counts from usage if available (Note: OpenAIStreamResponse doesn't have Usage)
+			// Token counts would need to be calculated differently for streaming responses
+			// For now, we'll rely on final usage reporting from the complete response
 		}
 	}
 
 exitLoop:
-	// Send final usage event
-	usage := models.ClaudeUsage{
-		InputTokens:  totalInputTokens,
-		OutputTokens: totalOutputTokens,
+	// Send final usage event if we have token counts
+	if totalInputTokens > 0 || totalOutputTokens > 0 {
+		usage := models.ClaudeUsage{
+			InputTokens:  totalInputTokens,
+			OutputTokens: totalOutputTokens,
+		}
+		stopEvent := converter.CreateClaudeStreamStopEvent(usage)
+		h.writeSSEEvent(c, "message_delta", stopEvent)
 	}
-	stopEvent := converter.CreateClaudeStreamStopEvent(usage)
-	h.writeSSEEvent(c, "message_delta", stopEvent)
+
+	// Send message_stop event
+	stopEvent := models.ClaudeStreamEvent{Type: "message_stop"}
+	h.writeSSEEvent(c, "message_stop", stopEvent)
 
 	duration := time.Since(startTime)
 	h.logger.WithFields(logrus.Fields{
@@ -306,7 +404,7 @@ exitLoop:
 			OpenAIModel: openaiReq.Model,
 			RequestBody: claudeReq,
 			ResponseBody: gin.H{
-				"usage":     usage,
+				"usage":     models.ClaudeUsage{InputTokens: totalInputTokens, OutputTokens: totalOutputTokens},
 				"streaming": true,
 			},
 			StatusCode:   statusCode,
@@ -322,6 +420,29 @@ exitLoop:
 				h.logger.WithError(err).Error("Failed to log request")
 			}
 		}()
+	}
+
+	// Save messages to session for context (only if successful)
+	if !hasError && h.sessionManager != nil {
+		sessionID := h.generateSessionID(projectPath, userID)
+
+		// Add user messages to session
+		for _, msg := range claudeReq.Messages {
+			if err := h.sessionManager.AddMessage(sessionID, msg, totalInputTokens/len(claudeReq.Messages)); err != nil {
+				h.logger.WithError(err).Warn("Failed to add user message to session")
+			}
+		}
+
+		// Add assistant response to session if we have content
+		if responseContent.Len() > 0 {
+			assistantMsg := models.ClaudeMessage{
+				Role:    "assistant",
+				Content: responseContent.String(),
+			}
+			if err := h.sessionManager.AddMessage(sessionID, assistantMsg, totalOutputTokens); err != nil {
+				h.logger.WithError(err).Warn("Failed to add assistant message to session")
+			}
+		}
 	}
 }
 
@@ -661,4 +782,11 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// generateSessionID generates a session ID based on project path and user ID
+func (h *MessagesHandler) generateSessionID(projectPath, userID string) string {
+	data := fmt.Sprintf("%s:%s", projectPath, userID)
+	hash := md5.Sum([]byte(data))
+	return fmt.Sprintf("session_%x", hash)
 }

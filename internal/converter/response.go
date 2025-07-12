@@ -39,8 +39,20 @@ func ConvertOpenAIToClaudeResponse(openaiResp *models.OpenAIChatCompletionRespon
 	return claudeResp, nil
 }
 
+// StreamingContext holds streaming state for proper Claude format conversion
+type StreamingContext struct {
+	MessageID       string
+	Model           string
+	InputTokens     int
+	OutputTokens    int
+	ContentStarted  bool
+	ToolCallStarted bool
+	CurrentToolCall map[string]interface{}
+	ContentBuffer   string
+}
+
 // ConvertOpenAIStreamToClaudeStream converts OpenAI streaming response to Claude format
-func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse, originalReq *models.ClaudeMessagesRequest) ([]models.ClaudeStreamEvent, error) {
+func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse, originalReq *models.ClaudeMessagesRequest, ctx *StreamingContext) ([]models.ClaudeStreamEvent, error) {
 	var events []models.ClaudeStreamEvent
 
 	if len(openaiChunk.Choices) == 0 {
@@ -49,9 +61,22 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 
 	choice := openaiChunk.Choices[0]
 
-	// Handle different types of streaming events
+	// Handle content block start if needed
+	if choice.Delta.Content != "" && !ctx.ContentStarted {
+		events = append(events, models.ClaudeStreamEvent{
+			Type:  "content_block_start",
+			Index: 0,
+			ContentBlock: &models.ClaudeContentBlock{
+				Type: "text",
+				Text: "",
+			},
+		})
+		ctx.ContentStarted = true
+	}
+
+	// Handle text content delta
 	if choice.Delta.Content != "" {
-		// Text content delta
+		ctx.ContentBuffer += choice.Delta.Content
 		events = append(events, models.ClaudeStreamEvent{
 			Type:  "content_block_delta",
 			Index: 0,
@@ -62,16 +87,37 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 		})
 	}
 
+	// Handle tool calls (if present) - Note: basic StreamDelta doesn't support tool calls
+	// This would need to be implemented if streaming tool calls are required
+
 	// Handle finish reason
 	if choice.FinishReason != "" {
+		// Send content block stop if content was started
+		if ctx.ContentStarted {
+			events = append(events, models.ClaudeStreamEvent{
+				Type:  "content_block_stop",
+				Index: 0,
+			})
+		}
+
 		stopReason := mapFinishReasonToClaudeStopReason(choice.FinishReason)
 
+		// Send message delta with stop reason and usage
 		events = append(events, models.ClaudeStreamEvent{
 			Type: "message_delta",
 			Delta: &models.ClaudeContentBlock{
 				Type: "stop_reason",
 				Text: stopReason,
 			},
+			Usage: &models.ClaudeUsage{
+				InputTokens:  ctx.InputTokens,
+				OutputTokens: ctx.OutputTokens,
+			},
+		})
+
+		// Send message stop
+		events = append(events, models.ClaudeStreamEvent{
+			Type: "message_stop",
 		})
 	}
 
@@ -137,15 +183,39 @@ func CreateClaudeStreamStartEvent(messageID, model string) models.ClaudeStreamEv
 	return models.ClaudeStreamEvent{
 		Type: "message_start",
 		Message: &models.ClaudeResponse{
-			ID:    messageID,
-			Type:  "message",
-			Role:  "assistant",
-			Model: model,
+			ID:           messageID,
+			Type:         "message",
+			Role:         "assistant",
+			Model:        model,
+			Content:      []models.ClaudeContentBlock{},
+			StopReason:   "",
+			StopSequence: nil,
 			Usage: models.ClaudeUsage{
 				InputTokens:  0,
 				OutputTokens: 0,
 			},
 		},
+	}
+}
+
+// CreateClaudeStreamPingEvent creates a ping event for keep-alive
+func CreateClaudeStreamPingEvent() models.ClaudeStreamEvent {
+	return models.ClaudeStreamEvent{
+		Type: "ping",
+	}
+}
+
+// CreateStreamingContext creates a new streaming context
+func CreateStreamingContext(messageID, model string, inputTokens int) *StreamingContext {
+	return &StreamingContext{
+		MessageID:       messageID,
+		Model:           model,
+		InputTokens:     inputTokens,
+		OutputTokens:    0,
+		ContentStarted:  false,
+		ToolCallStarted: false,
+		CurrentToolCall: make(map[string]interface{}),
+		ContentBuffer:   "",
 	}
 }
 

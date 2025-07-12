@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent"
@@ -31,6 +32,12 @@ func (User) Fields() []ent.Field {
 			Comment("Password salt"),
 		field.String("role").
 			Default("user").
+			Validate(func(s string) error {
+				if s != "admin" && s != "user" {
+					return fmt.Errorf("role must be either 'admin' or 'user'")
+				}
+				return nil
+			}).
 			Comment("User role: admin, user"),
 		field.Bool("is_active").
 			Default(true).

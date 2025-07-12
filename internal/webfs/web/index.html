@@ -73,7 +73,7 @@
                             <div class="user-details">
                                 <div class="user-info-text">
                                     <span class="user-name" id="userName">管理员</span>
-                                    <span class="user-role" id="userRole">管理员</span>
+                                    <span class="user-role" id="currentUserRole">管理员</span>
                                 </div>
                                 <div class="logout-icon" id="logoutBtn" title="退出" data-i18n-title="login.logout">
                                     <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
@@ -571,6 +571,9 @@
                                 </tr>
                             </tbody>
                         </table>
+                        
+                        <!-- 分页容器 -->
+                        <div class="pagination-container" id="usersPagination"></div>
                     </div>
                 </div>
 
@@ -796,9 +799,9 @@ claude</code></pre>
                     </div>
                     <div class="form-group">
                         <label for="userRole" data-i18n="users.role">角色</label>
-                        <select id="userRole">
+                        <select id="userRole" required>
+                            <option value="user" data-i18n="users.role_user" selected>用户</option>
                             <option value="admin" data-i18n="users.role_admin">管理员</option>
-                            <option value="user" data-i18n="users.role_user">用户</option>
                         </select>
                     </div>
                     <div class="form-group">

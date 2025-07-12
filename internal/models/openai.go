@@ -22,8 +22,23 @@ type StreamChoice struct {
 
 // StreamDelta represents a delta in a stream response
 type StreamDelta struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string                `json:"role,omitempty"`
+	Content   string                `json:"content,omitempty"`
+	ToolCalls []OpenAIToolCallDelta `json:"tool_calls,omitempty"`
+}
+
+// OpenAIToolCallDelta represents a tool call delta in streaming
+type OpenAIToolCallDelta struct {
+	Index    int                     `json:"index"`
+	ID       string                  `json:"id,omitempty"`
+	Type     string                  `json:"type,omitempty"`
+	Function OpenAIFunctionCallDelta `json:"function,omitempty"`
+}
+
+// OpenAIFunctionCallDelta represents a function call delta in streaming
+type OpenAIFunctionCallDelta struct {
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
 }
 
 // Usage represents usage information

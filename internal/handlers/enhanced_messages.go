@@ -88,14 +88,28 @@ func (h *EnhancedMessagesHandler) CreateMessage(c *gin.Context) {
 
 	// Log enhanced request info including Claude Code specific fields
 	h.logger.WithFields(logrus.Fields{
-		"request_id": requestID,
-		"model":      claudeReq.Model,
-		"stream":     claudeReq.Stream,
-		"max_tokens": claudeReq.MaxTokens,
-		"thinking":   claudeReq.Thinking,
-		"has_tools":  len(claudeReq.Tools) > 0,
-		"has_system": claudeReq.System != nil,
+		"request_id":  requestID,
+		"model":       claudeReq.Model,
+		"stream":      claudeReq.Stream,
+		"max_tokens":  claudeReq.MaxTokens,
+		"thinking":    claudeReq.Thinking,
+		"has_tools":   len(claudeReq.Tools) > 0,
+		"tools_count": len(claudeReq.Tools),
+		"has_system":  claudeReq.System != nil,
+		"tool_choice": claudeReq.ToolChoice,
 	}).Info("Processing Claude Code compatible request")
+
+	// Log tool details if present
+	if len(claudeReq.Tools) > 0 {
+		for i, tool := range claudeReq.Tools {
+			h.logger.WithFields(logrus.Fields{
+				"request_id": requestID,
+				"tool_index": i,
+				"tool_name":  tool.Name,
+				"tool_desc":  tool.Description,
+			}).Debug("Tool definition details")
+		}
+	}
 
 	// Check for model commands in message content
 	if len(claudeReq.Messages) > 0 {
@@ -248,6 +262,55 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 
 // processStreamChunk processes individual stream chunks and converts them to Claude Code events
 func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *claudecode.StreamingContext, data interface{}, inputTokens, outputTokens *int) {
+	// Handle OpenAIStreamResponse type
+	if streamResp, ok := data.(*models.OpenAIStreamResponse); ok {
+		// Handle choices
+		if len(streamResp.Choices) > 0 {
+			choice := streamResp.Choices[0]
+
+			// Handle delta content
+			if choice.Delta.Content != "" {
+				h.logger.WithFields(logrus.Fields{
+					"content": choice.Delta.Content,
+					"type":    "text_delta",
+				}).Debug("Processing text chunk")
+				h.streamingService.ProcessTextChunk(c, streamCtx, choice.Delta.Content)
+			}
+
+			// Handle tool calls - with detailed logging
+			if len(choice.Delta.ToolCalls) > 0 {
+				h.logger.WithFields(logrus.Fields{
+					"tool_calls_count": len(choice.Delta.ToolCalls),
+					"tool_calls":       choice.Delta.ToolCalls,
+				}).Info("Processing tool call deltas from OpenAI")
+
+				// Convert to interface{} slice for the streaming service
+				toolCallDeltas := make([]interface{}, len(choice.Delta.ToolCalls))
+				for i, tc := range choice.Delta.ToolCalls {
+					toolCallDeltas[i] = map[string]interface{}{
+						"index": tc.Index,
+						"id":    tc.ID,
+						"type":  tc.Type,
+						"function": map[string]interface{}{
+							"name":      tc.Function.Name,
+							"arguments": tc.Function.Arguments,
+						},
+					}
+					h.logger.WithFields(logrus.Fields{
+						"tool_call_index": tc.Index,
+						"tool_call_id":    tc.ID,
+						"tool_call_type":  tc.Type,
+						"function_name":   tc.Function.Name,
+						"function_args":   tc.Function.Arguments,
+					}).Debug("Tool call delta details")
+				}
+				h.streamingService.ProcessToolCallDeltas(c, streamCtx, toolCallDeltas)
+			}
+		}
+		return
+	}
+
+	// Fallback: handle as map[string]interface{} for compatibility
 	if dataMap, ok := data.(map[string]interface{}); ok {
 		// Handle choices
 		if choices, exists := dataMap["choices"]; exists {
@@ -265,7 +328,13 @@ func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *
 
 							// Handle tool calls
 							if toolCalls, exists := deltaMap["tool_calls"]; exists {
-								h.streamingService.ProcessToolCall(c, streamCtx, toolCalls)
+								if toolCallsArray, ok := toolCalls.([]interface{}); ok {
+									h.logger.WithFields(logrus.Fields{
+										"tool_calls_count": len(toolCallsArray),
+										"tool_calls":       toolCallsArray,
+									}).Info("Processing tool call deltas from map interface")
+									h.streamingService.ProcessToolCallDeltas(c, streamCtx, toolCallsArray)
+								}
 							}
 						}
 					}
@@ -277,13 +346,13 @@ func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *
 		if usage, exists := dataMap["usage"]; exists {
 			if usageMap, ok := usage.(map[string]interface{}); ok {
 				if prompt, exists := usageMap["prompt_tokens"]; exists {
-					if promptInt, ok := prompt.(int); ok {
-						*inputTokens = promptInt
+					if promptFloat, ok := prompt.(float64); ok {
+						*inputTokens = int(promptFloat)
 					}
 				}
 				if completion, exists := usageMap["completion_tokens"]; exists {
-					if completionInt, ok := completion.(int); ok {
-						*outputTokens = completionInt
+					if completionFloat, ok := completion.(float64); ok {
+						*outputTokens = int(completionFloat)
 					}
 				}
 			}

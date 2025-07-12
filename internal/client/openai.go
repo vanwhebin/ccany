@@ -189,11 +189,9 @@ func (c *OpenAIClient) CreateChatCompletionStream(ctx context.Context, req *mode
 		}
 	}
 
-	// Add timeout to context
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-
-	stream, err := c.client.CreateChatCompletionStream(ctxWithTimeout, openaiReq)
+	// For streaming requests, use the provided context directly to avoid double timeout
+	// The handler already sets appropriate timeout based on request type
+	stream, err := c.client.CreateChatCompletionStream(ctx, openaiReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat completion stream: %w", err)
 	}

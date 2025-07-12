@@ -239,3 +239,28 @@ func InitializeDatabase(ctx context.Context, dbConfig *Config, masterKey string)
 
 	return db, nil
 }
+
+// NewTestDB creates an in-memory test database
+func NewTestDB() (*Database, error) {
+	cfg := &Config{
+		Type:            "sqlite",
+		Database:        ":memory:",
+		DataPath:        "",
+		MaxOpenConns:    1,
+		MaxIdleConns:    1,
+		ConnMaxLifetime: time.Hour,
+	}
+
+	db, err := NewDatabase(cfg, "test-master-key")
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the schema
+	if err := db.Initialize(context.Background()); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}

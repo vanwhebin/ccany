@@ -12,6 +12,7 @@ import (
 	"ccany/ent"
 	"ccany/ent/user"
 	"ccany/internal/database"
+	"ccany/internal/i18n"
 	"ccany/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,7 @@ type UserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role" binding:"required,oneof=admin user"`
+	IsActive *bool  `json:"is_active"`
 }
 
 // UserUpdateRequest user update request structure
@@ -115,7 +117,7 @@ func (h *UsersHandler) Login(c *gin.Context) {
 	// check if user is active
 	if !foundUser.IsActive {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Account is disabled",
+			"error": i18n.T(c, "errors.account_disabled"),
 		})
 		return
 	}
@@ -294,14 +296,24 @@ func (h *UsersHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	// generate user ID
+	userID := h.generateID()
+
+	// determine if user should be active
+	isActive := true // default to active
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
 	// create user
 	newUser, err := h.db.Client.User.Create().
+		SetID(userID).
 		SetUsername(req.Username).
 		SetEmail(req.Email).
 		SetPasswordHash(passwordHash).
 		SetSalt(salt).
 		SetRole(req.Role).
-		SetIsActive(true).
+		SetIsActive(isActive).
 		Save(ctx)
 
 	if err != nil {
@@ -618,4 +630,15 @@ func (h *UsersHandler) verifyPassword(password, hash, salt string) bool {
 	combined := password + salt
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(combined))
 	return err == nil
+}
+
+// generateID generates random user ID
+func (h *UsersHandler) generateID() string {
+	id := make([]byte, 8)
+	_, err := rand.Read(id)
+	if err != nil {
+		// if random generation fails, use timestamp as fallback
+		return fmt.Sprintf("user_%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(id)
 }

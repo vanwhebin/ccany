@@ -182,6 +182,15 @@ func main() {
 	// Setup routes
 	setupRoutes(router, messagesHandler, healthHandler, configHandler, usersHandler, authMiddleware, setupHandler, requestLogsHandler, monitoringHandler, i18nHandler)
 
+	// Add Claude Code specific endpoints
+	router.GET("/claude-status", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "running",
+			"healthy":   true,
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	})
+
 	// Serve static files - use embed filesystem
 	router.StaticFS("/static", http.FS(webfs.GetStaticFS()))
 	router.GET("/favicon.ico", func(c *gin.Context) {

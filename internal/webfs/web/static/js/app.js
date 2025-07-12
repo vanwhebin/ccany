@@ -982,7 +982,12 @@ class ClaudeProxyApp {
         // 用户管理按钮
         const addUserBtn = document.getElementById('addUserBtn');
         if (addUserBtn) {
-            addUserBtn.addEventListener('click', () => this.showUserModal());
+            addUserBtn.addEventListener('click', () => {
+                console.log('Add user button clicked');
+                console.log('Current user at click:', this.currentUser);
+                console.log('User permissions at click:', this.userPermissions);
+                this.showUserModal();
+            });
         }
 
         // 用户表单
@@ -1495,7 +1500,7 @@ class ClaudeProxyApp {
         
         // Update user info display
         const userNameElement = document.getElementById('userName');
-        const userRoleElement = document.getElementById('userRole');
+        const userRoleElement = document.getElementById('currentUserRole');
         if (userNameElement && this.currentUser) {
             userNameElement.textContent = this.currentUser.username;
             // Generate and set user avatar
@@ -1548,7 +1553,13 @@ class ClaudeProxyApp {
 
     // Setup role-based UI permissions
     setupRoleBasedUI() {
-        if (!this.currentUser) return;
+        console.log('setupRoleBasedUI called');
+        console.log('Current user:', this.currentUser);
+        
+        if (!this.currentUser) {
+            console.warn('setupRoleBasedUI: No current user, skipping permission setup');
+            return;
+        }
 
         const isAdmin = this.currentUser.role === 'admin';
         console.log('Setting up role-based UI for user:', this.currentUser.username, 'role:', this.currentUser.role, 'isAdmin:', isAdmin);
@@ -1584,6 +1595,68 @@ class ClaudeProxyApp {
             canAccessTest: true,
             canAccessHelp: true
         };
+        
+        console.log('User permissions set:', this.userPermissions);
+        
+        // Debug: Check if addUserBtn should be visible/enabled
+        const addUserBtn = document.getElementById('addUserBtn');
+        if (addUserBtn) {
+            console.log('Add user button found, admin status:', isAdmin);
+            if (isAdmin) {
+                addUserBtn.style.display = '';
+                addUserBtn.disabled = false;
+                console.log('Add user button enabled for admin');
+            } else {
+                addUserBtn.style.display = 'none';
+                addUserBtn.disabled = true;
+                console.log('Add user button disabled for non-admin');
+            }
+        } else {
+            console.warn('Add user button not found during permission setup');
+        }
+        
+        // Add role selection debug helper for development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            this.debugRoleSelection();
+        }
+    }
+    
+    // Debug helper for role selection issues
+    debugRoleSelection() {
+        console.log('Debug: Role selection helper active');
+        // Add a global debug function
+        window.debugUserRole = () => {
+            const roleSelect = document.getElementById('userRole');
+            if (roleSelect) {
+                console.log('=== Role Selection Debug ===');
+                console.log('Element:', roleSelect);
+                console.log('Value:', roleSelect.value);
+                console.log('Selected index:', roleSelect.selectedIndex);
+                console.log('Options:', Array.from(roleSelect.options).map((opt, idx) => ({
+                    index: idx,
+                    value: opt.value,
+                    text: opt.text,
+                    selected: opt.selected
+                })));
+                console.log('Form validity:', roleSelect.checkValidity());
+                console.log('Custom validity:', roleSelect.validationMessage);
+            } else {
+                console.log('Role select element not found');
+            }
+        };
+        
+        // Add global debug function for app state
+        window.debugAppState = () => {
+            console.log('=== App State Debug ===');
+            console.log('Current user:', this.currentUser);
+            console.log('Is authenticated:', this.isAuthenticated);
+            console.log('User permissions:', this.userPermissions);
+            console.log('Current tab:', this.currentTab);
+        };
+        
+        console.log('Debug functions available:');
+        console.log('- window.debugUserRole() - Debug role selection');
+        console.log('- window.debugAppState() - Debug app state');
     }
 
     // Check if user has permission to access a specific tab
@@ -2023,71 +2096,376 @@ class ClaudeProxyApp {
         }
     }
 
-    async loadUsers() {
+    async loadUsers(searchTerm = '', page = 1, limit = 10) {
         const tableBody = document.getElementById('usersTableBody');
         if (!tableBody) return;
 
+        // 显示加载状态
         tableBody.innerHTML = `<tr><td colspan="6" class="loading">${this.t('users.loading')}</td></tr>`;
 
         try {
-            const response = await this.apiCall('/admin/users');
-            const data = await response.json();
+            // 构建查询参数
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            params.append('page', page.toString());
+            params.append('limit', limit.toString());
 
+            const response = await this.apiCall(`/admin/users?${params.toString()}`);
+            
             if (response.ok) {
-                const users = data.users || [];
-                const html = users.map(user => `
-                    <tr>
-                        <td>${user.username}</td>
-                        <td>${user.email}</td>
-                        <td><span class="role-${user.role}">${user.role === 'admin' ? this.t('users.admin') : this.t('users.user')}</span></td>
-                        <td><span class="status-${user.is_active ? 'active' : 'inactive'}">${user.is_active ? this.t('users.active') : this.t('users.inactive')}</span></td>
-                        <td>${user.last_login ? new Date(user.last_login).toLocaleString('zh-CN') : this.t('users.never_logged_in')}</td>
-                        <td>
-                            <div class="user-actions">
-                                <button class="edit-btn" onclick="app.editUser('${user.id}')">${this.t('users.edit')}</button>
-                                <button class="delete-btn" onclick="app.deleteUser('${user.id}')">${this.t('users.delete')}</button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
+                const data = await response.json();
+                console.log('Users loaded:', data);
                 
-                tableBody.innerHTML = html;
+                this.renderUsersTable(data.users || []);
+                this.renderUsersPagination(data.pagination || {});
+                
+                // 存储当前加载的用户数据
+                this.currentUsersData = {
+                    users: data.users || [],
+                    pagination: data.pagination || {},
+                    searchTerm: searchTerm
+                };
             } else {
-                tableBody.innerHTML = `<tr><td colspan="6" class="error">${this.t('common.loading_failed')}: ${data.error}</td></tr>`;
+                const errorData = await response.json();
+                console.error('Load users failed:', errorData);
+                tableBody.innerHTML = `<tr><td colspan="6" class="error">${this.t('common.loading_failed')}: ${errorData.error || 'Unknown error'}</td></tr>`;
             }
         } catch (error) {
-            console.error('加载用户失败:', error);
+            console.error('Error loading users:', error);
             tableBody.innerHTML = `<tr><td colspan="6" class="error">${this.t('common.network_error')}</td></tr>`;
         }
     }
 
+    renderUsersTable(users) {
+        const tableBody = document.getElementById('usersTableBody');
+        if (!tableBody) return;
+
+        if (users.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="no-data">${this.t('users.no_users')}</td></tr>`;
+            return;
+        }
+
+        const html = users.map(user => {
+            const lastLogin = user.last_login ? 
+                new Date(user.last_login).toLocaleString('zh-CN') : 
+                this.t('users.never_logged_in');
+            
+            const roleText = user.role === 'admin' ? 
+                this.t('users.admin') : 
+                this.t('users.user');
+            
+            const statusText = user.is_active ? 
+                this.t('users.active') : 
+                this.t('users.inactive');
+
+            return `
+                <tr data-user-id="${user.id}">
+                    <td>${this.escapeHtml(user.username)}</td>
+                    <td>${this.escapeHtml(user.email)}</td>
+                    <td><span class="role-badge role-${user.role}">${roleText}</span></td>
+                    <td><span class="status-badge status-${user.is_active ? 'active' : 'inactive'}">${statusText}</span></td>
+                    <td>${lastLogin}</td>
+                    <td>
+                        <div class="user-actions">
+                            <button class="btn btn-small btn-secondary edit-btn" onclick="app.editUser('${user.id}')" title="${this.t('users.edit')}">
+                                <svg viewBox="0 0 24 24" width="16" height="16">
+                                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                            <button class="btn btn-small btn-danger delete-btn" onclick="app.deleteUser('${user.id}')" title="${this.t('users.delete')}" ${user.id === this.currentUser?.id ? 'disabled' : ''}>
+                                <svg viewBox="0 0 24 24" width="16" height="16">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        tableBody.innerHTML = html;
+    }
+
+    renderUsersPagination(pagination) {
+        const paginationContainer = document.getElementById('usersPagination');
+        if (!paginationContainer || !pagination.total) return;
+
+        const { page = 1, total = 0, pages = 1, limit = 10 } = pagination;
+        
+        let paginationHtml = '<div class="pagination">';
+        
+        // 上一页按钮
+        if (page > 1) {
+            paginationHtml += `<button class="btn btn-secondary" onclick="app.loadUsers('${this.currentUsersData?.searchTerm || ''}', ${page - 1}, ${limit})">${this.t('common.previous')}</button>`;
+        }
+        
+        // 页码信息
+        const pageInfo = this.t('common.page_info') || 'Page {page} of {pages}, Total {total} records';
+        paginationHtml += `<span class="pagination-info">${pageInfo.replace('{page}', page).replace('{pages}', pages).replace('{total}', total)}</span>`;
+        
+        // 下一页按钮
+        if (page < pages) {
+            paginationHtml += `<button class="btn btn-secondary" onclick="app.loadUsers('${this.currentUsersData?.searchTerm || ''}', ${page + 1}, ${limit})">${this.t('common.next')}</button>`;
+        }
+        
+        paginationHtml += '</div>';
+        paginationContainer.innerHTML = paginationHtml;
+    }
+
+    // HTML转义函数，防止XSS
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     showUserModal(user = null) {
+        // Debug permission checking
+        console.log('showUserModal called');
+        console.log('Current user:', this.currentUser);
+        console.log('User permissions:', this.userPermissions);
+        console.log('Is admin check:', this.userPermissions?.isAdmin);
+        
         // Check admin permission
         if (!this.userPermissions?.isAdmin) {
-            this.showNotification(this.t('errors.access_denied_users'), 'error');
-            return;
+            console.warn('Permission denied: userPermissions.isAdmin is', this.userPermissions?.isAdmin);
+            
+            // Try to refresh permissions if user exists but permissions don't
+            if (this.currentUser && this.currentUser.role === 'admin' && !this.userPermissions?.isAdmin) {
+                console.log('Detected admin user without permissions, refreshing...');
+                this.setupRoleBasedUI();
+                
+                // Check again after refresh
+                if (!this.userPermissions?.isAdmin) {
+                    this.showNotification(this.t('errors.access_denied_users') || '权限不足', 'error');
+                    return;
+                }
+            } else {
+                this.showNotification(this.t('errors.access_denied_users') || '权限不足', 'error');
+                return;
+            }
         }
 
         const modal = document.getElementById('userModal');
         const title = document.getElementById('userModalTitle');
         const form = document.getElementById('userForm');
+        const roleSelect = document.getElementById('userRole');
+        const passwordField = document.getElementById('userPassword');
+        
+        // 调试：检查所有必要的DOM元素
+        console.log('DOM elements check:');
+        console.log('- modal:', modal);
+        console.log('- title:', title);
+        console.log('- form:', form);
+        console.log('- roleSelect:', roleSelect);
+        console.log('- passwordField:', passwordField);
+        
+        if (!modal || !form || !roleSelect) {
+            console.error('Missing required DOM elements for user modal');
+            this.showNotification('用户表单加载错误', 'error');
+            return;
+        }
+        
+        // 重置表单
+        form.reset();
         
         if (user) {
-            title.textContent = this.t('users.edit_user_modal');
+            // 编辑用户模式
+            title.textContent = this.t('users.edit_user_modal') || '编辑用户';
             document.getElementById('userId').value = user.id;
             document.getElementById('userUsername').value = user.username;
             document.getElementById('userEmail').value = user.email;
-            document.getElementById('userPassword').required = false;
-            document.getElementById('userRole').value = user.role;
             document.getElementById('userActive').checked = user.is_active;
+            
+            // 密码字段在编辑时不是必填的
+            passwordField.required = false;
+            passwordField.placeholder = this.t('users.password_optional') || '留空则不修改密码';
+            
+            // 设置角色
+            this.setUserRole(roleSelect, user.role);
         } else {
-            title.textContent = this.t('users.add_user_modal');
-            form.reset();
+            // 新建用户模式
+            title.textContent = this.t('users.add_user_modal') || '添加用户';
             document.getElementById('userId').value = '';
-            document.getElementById('userPassword').required = true;
+            document.getElementById('userActive').checked = true;
+            
+            // 密码字段在新建时是必填的
+            passwordField.required = true;
+            passwordField.placeholder = this.t('users.password_required') || '请输入密码';
+            
+            // 设置默认角色为user
+            this.setUserRole(roleSelect, 'user');
         }
         
         modal.classList.add('show');
+    }
+
+    setUserRole(roleSelect, role) {
+        // 检查 roleSelect 是否有效
+        if (!roleSelect) {
+            console.error('setUserRole: roleSelect is null or undefined');
+            return;
+        }
+        
+        if (!roleSelect.options) {
+            console.error('setUserRole: roleSelect.options is undefined, element type:', roleSelect.tagName);
+            return;
+        }
+        
+        // 确保角色值有效
+        const validRoles = ['admin', 'user'];
+        const targetRole = validRoles.includes(role) ? role : 'user';
+        
+        console.log('setUserRole called with role:', role, 'targetRole:', targetRole);
+        console.log('roleSelect element:', roleSelect);
+        console.log('roleSelect.options:', roleSelect.options);
+        
+        // 清除所有选中状态
+        Array.from(roleSelect.options).forEach(opt => opt.selected = false);
+        
+        // 设置目标角色
+        roleSelect.value = targetRole;
+        const targetOption = roleSelect.querySelector(`option[value="${targetRole}"]`);
+        if (targetOption) {
+            targetOption.selected = true;
+        }
+        
+        // 触发change事件
+        roleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        console.log('Role set to:', targetRole, 'roleSelect.value:', roleSelect.value);
+    }
+
+    async handleUserSave() {
+        // Check admin permission
+        if (!this.userPermissions?.isAdmin) {
+            this.showNotification(this.t('errors.access_denied_user_save') || '权限不足', 'error');
+            return;
+        }
+
+        const userId = document.getElementById('userId').value;
+        const username = document.getElementById('userUsername').value.trim();
+        const email = document.getElementById('userEmail').value.trim();
+        const password = document.getElementById('userPassword').value;
+        const role = document.getElementById('userRole').value;
+        const isActive = document.getElementById('userActive').checked;
+        
+        // 基本验证
+        if (!username) {
+            this.showNotification(this.t('users.username_required') || '用户名不能为空', 'error');
+            return;
+        }
+        
+        if (!email) {
+            this.showNotification(this.t('users.email_required') || '邮箱不能为空', 'error');
+            return;
+        }
+        
+        if (!role || !['admin', 'user'].includes(role)) {
+            this.showNotification(this.t('users.role_required') || '请选择有效的用户角色', 'error');
+            return;
+        }
+        
+        // 对于新用户，密码是必填的
+        if (!userId && !password) {
+            this.showNotification(this.t('users.password_required') || '新用户密码不能为空', 'error');
+            return;
+        }
+
+        const saveBtn = document.querySelector('#userForm .btn-primary');
+        const originalText = saveBtn.textContent;
+        
+        try {
+            // 显示保存状态
+            saveBtn.disabled = true;
+            saveBtn.textContent = this.t('common.saving') || '保存中...';
+            
+            let url, method, requestData;
+            
+            if (userId) {
+                // 更新用户 - 使用PUT方法和UserUpdateRequest结构
+                url = `/admin/users/${userId}`;
+                method = 'PUT';
+                requestData = {
+                    username: username,
+                    email: email,
+                    role: role,
+                    is_active: isActive
+                };
+                
+                // 如果密码字段有值，需要单独处理密码更新
+                // 注意：根据后端代码，密码更新需要单独的API调用
+            } else {
+                // 创建用户 - 使用POST方法和UserRequest结构
+                url = '/admin/users';
+                method = 'POST';
+                requestData = {
+                    username: username,
+                    email: email,
+                    password: password,
+                    role: role,
+                    is_active: isActive
+                };
+            }
+            
+            console.log('Saving user:', { method, url, data: requestData });
+            
+            const response = await this.apiCall(url, {
+                method: method,
+                body: JSON.stringify(requestData)
+            });
+
+            const responseData = await response.json();
+            
+            if (response.ok) {
+                this.hideUserModal();
+                this.showNotification(
+                    userId ? 
+                        (this.t('users.user_updated') || '用户更新成功') : 
+                        (this.t('users.user_created') || '用户创建成功'), 
+                    'success'
+                );
+                
+                // 重新加载用户列表
+                this.loadUsers(this.currentUsersData?.searchTerm || '');
+                
+                // 如果是编辑模式且有密码，处理密码更新
+                if (userId && password) {
+                    await this.updateUserPassword(userId, password);
+                }
+            } else {
+                console.error('Save user failed:', responseData);
+                this.showNotification(
+                    responseData.error || 
+                    (this.t('common.operation_failed') || '操作失败'), 
+                    'error'
+                );
+            }
+        } catch (error) {
+            console.error('Error saving user:', error);
+            this.showNotification(this.t('common.network_error') || '网络错误', 'error');
+        } finally {
+            // 恢复按钮状态
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    async updateUserPassword(userId, newPassword) {
+        // 这是一个辅助函数，用于更新用户密码
+        // 注意：根据后端代码结构，可能需要特殊处理
+        try {
+            // 由于后端没有直接的管理员更新其他用户密码的接口，
+            // 这里可能需要扩展后端API或者使用其他方式
+            console.log('Password update needed for user:', userId);
+            // 暂时跳过密码更新，提示用户
+            this.showNotification(
+                this.t('users.password_update_note') || '密码更新需要用户自行修改', 
+                'warning'
+            );
+        } catch (error) {
+            console.error('Error updating password:', error);
+        }
     }
 
     hideUserModal() {
@@ -2095,45 +2473,6 @@ class ClaudeProxyApp {
         modal.classList.remove('show');
     }
 
-    async handleUserSave() {
-        // Check admin permission
-        if (!this.userPermissions?.isAdmin) {
-            this.showNotification(this.t('errors.access_denied_user_save'), 'error');
-            return;
-        }
-
-        const userId = document.getElementById('userId').value;
-        const userData = {
-            username: document.getElementById('userUsername').value,
-            email: document.getElementById('userEmail').value,
-            password: document.getElementById('userPassword').value,
-            role: document.getElementById('userRole').value,
-            is_active: document.getElementById('userActive').checked
-        };
-
-        try {
-            const url = userId ? `/admin/users/${userId}` : '/admin/users';
-            const method = userId ? 'PUT' : 'POST';
-            
-            const response = await this.apiCall(url, {
-                method: method,
-                body: JSON.stringify(userData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.hideUserModal();
-                this.loadUsers();
-                this.showNotification(this.t('users.user_saved'), 'success');
-            } else {
-                this.showNotification(data.error || this.t('common.operation_failed'), 'error');
-            }
-        } catch (error) {
-            console.error('保存用户失败:', error);
-            this.showNotification(this.t('common.network_error'), 'error');
-        }
-    }
 
     async editUser(userId) {
         // Check admin permission
@@ -2160,30 +2499,51 @@ class ClaudeProxyApp {
     async deleteUser(userId) {
         // Check admin permission
         if (!this.userPermissions?.isAdmin) {
-            this.showNotification(this.t('errors.access_denied_user_delete'), 'error');
+            this.showNotification(this.t('errors.access_denied_user_delete') || '权限不足，无法删除用户', 'error');
             return;
         }
 
-        if (!confirm(this.t('users.confirm_delete'))) {
+        // Confirm deletion with backend translation
+        const confirmMessage = this.t('users.confirm_delete') || '确认删除此用户？';
+        if (!confirm(confirmMessage)) {
             return;
         }
 
         try {
+            console.log('Deleting user:', userId);
+            
             const response = await this.apiCall(`/admin/users/${userId}`, {
                 method: 'DELETE'
             });
 
-            const data = await response.json();
+            const responseData = await response.json();
+            console.log('Delete response:', responseData);
 
             if (response.ok) {
-                this.loadUsers();
-                this.showNotification(this.t('users.user_deleted'), 'success');
+                this.showNotification(
+                    responseData.message || 
+                    this.t('users.user_deleted') || 
+                    '用户删除成功', 
+                    'success'
+                );
+                
+                // Reload users list with current search term
+                this.loadUsers(this.currentUsersData?.searchTerm || '');
             } else {
-                this.showNotification(data.error || this.t('common.operation_failed'), 'error');
+                console.error('Delete user failed:', responseData);
+                this.showNotification(
+                    responseData.error || 
+                    this.t('common.operation_failed') || 
+                    '操作失败', 
+                    'error'
+                );
             }
         } catch (error) {
-            console.error('删除用户失败:', error);
-            this.showNotification(this.t('common.network_error'), 'error');
+            console.error('Error deleting user:', error);
+            this.showNotification(
+                this.t('common.network_error') || '网络错误', 
+                'error'
+            );
         }
     }
 

@@ -58,6 +58,9 @@ This guide covers the deployment of the enhanced CCany application with full Cla
 | `MAX_TOKENS_LIMIT` | Maximum tokens per request | `8192` |
 | `REQUEST_TIMEOUT` | Request timeout in seconds | `120` |
 | `CLAUDE_CODE_COMPATIBLE` | Enable Claude Code compatibility | `true` |
+| `CLAUDE_PROXY_DATA_PATH` | Data storage directory | `./data` |
+| `CLAUDE_PROXY_MASTER_KEY` | Master key for encrypting sensitive configs | Required for production |
+| `JWT_SECRET` | JWT key for user authentication | Required for production |
 
 ### Claude Code Features
 

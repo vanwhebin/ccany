@@ -8,18 +8,14 @@ before:
 
 builds:
   - main: ./cmd/server
+    binary: ccany
     env:
       - CGO_ENABLED=1
     goos:
       - linux
-      - darwin
-      - windows
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
     ldflags:
       - -s -w
       - -X main.Version={{.Version}}
@@ -33,12 +29,16 @@ archives:
 
 # Docker images
 dockers:
-  - image_templates:
+  - id: ccany-amd64
+    goos: linux
+    goarch: amd64
+    image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-amd64"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
+      - "--pull"
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
@@ -47,12 +47,17 @@ dockers:
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--build-arg=VERSION={{.Version}}"
       - "--build-arg=BUILD_TIME={{.Date}}"
-  - image_templates:
+  
+  - id: ccany-arm64
+    goos: linux
+    goarch: arm64
+    image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-arm64"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
+      - "--pull"
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"

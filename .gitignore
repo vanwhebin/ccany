@@ -28,7 +28,16 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
 /cmd/server/server
 /cmd/server/data/
+
+# Data directory and database files
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Reference directories
+ref/

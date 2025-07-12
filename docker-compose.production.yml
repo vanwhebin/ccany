@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # CCany production service using published Docker images
+  ccany:
+    image: czyt/ccany:latest
+    # Alternative GitHub Container Registry:
+    # image: ghcr.io/ca-x/ccany:latest
+    container_name: ccany
+    ports:
+      - "8082:8082"
+    environment:
+      # Required: API Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?Please set OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      
+      # Optional: Claude API Configuration
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - CLAUDE_BASE_URL=${CLAUDE_BASE_URL:-https://api.anthropic.com}
+      
+      # Model Configuration
+      - BIG_MODEL=${BIG_MODEL:-gpt-4o}
+      - SMALL_MODEL=${SMALL_MODEL:-gpt-4o-mini}
+      
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8082
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Performance Configuration
+      - MAX_TOKENS_LIMIT=${MAX_TOKENS_LIMIT:-8192}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-120}
+      - TEMPERATURE=${TEMPERATURE:-0.7}
+      - STREAM_ENABLED=${STREAM_ENABLED:-true}
+      
+      # Data and Security Configuration
+      - CLAUDE_PROXY_DATA_PATH=/app/data
+      - CLAUDE_PROXY_MASTER_KEY=${CLAUDE_PROXY_MASTER_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      
+      # Claude Code Compatibility
+      - CLAUDE_CODE_COMPATIBLE=true
+      - CLAUDE_CONFIG_PATH=/home/appuser/.claude.json
+      
+    volumes:
+      - ccany_data:/app/data
+      - ccany_logs:/app/logs
+      - claude_config:/home/appuser/.claude
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  ccany_data:
+    driver: local
+  ccany_logs:
+    driver: local
+  claude_config:
+    driver: local

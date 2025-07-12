@@ -3,12 +3,15 @@ version: '3.8'
 services:
   # Enhanced CCany application service with Claude Code support
   ccany:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VERSION: ${VERSION:-dev}
-        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: czyt/ccany:latest
+    # Alternative: ghcr.io/ca-x/ccany:latest
+    # Or build locally:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     VERSION: ${VERSION:-dev}
+    #     BUILD_TIME: ${BUILD_TIME:-unknown}
     container_name: ccany-enhanced
     ports:
       - "8082:8082"

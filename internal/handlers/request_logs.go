@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"ccany/ent"
 	"ccany/internal/logging"
 
 	"github.com/gin-gonic/gin"
@@ -187,44 +188,38 @@ func (h *RequestLogsHandler) GetRequestLogDetails(c *gin.Context) {
 	}
 
 	// query single log by ID
-	opts := &logging.RequestLogQueryOptions{
-		Limit: 1,
-	}
-
-	logs, err := h.requestLogger.GetRequestLogs(c.Request.Context(), opts)
+	log, err := h.requestLogger.GetRequestLogByID(c.Request.Context(), id)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Request log not found"})
+			return
+		}
 		h.logger.WithError(err).Error("Failed to get request log details")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get request log details"})
 		return
 	}
 
-	// find matching log
-	var targetLog *logging.RequestLogData
-	for _, log := range logs {
-		if log.ID == id {
-			targetLog = &logging.RequestLogData{
-				ID:           log.ID,
-				ClaudeModel:  log.ClaudeModel,
-				OpenAIModel:  log.OpenaiModel,
-				StatusCode:   log.StatusCode,
-				IsStreaming:  log.IsStreaming,
-				InputTokens:  log.InputTokens,
-				OutputTokens: log.OutputTokens,
-				DurationMs:   log.DurationMs,
-				ErrorMessage: log.ErrorMessage,
-				CreatedAt:    log.CreatedAt,
-			}
-			break
-		}
+	// prepare detailed response
+	response := gin.H{
+		"id":            log.ID,
+		"claude_model":  log.ClaudeModel,
+		"openai_model":  log.OpenaiModel,
+		"status_code":   log.StatusCode,
+		"is_streaming":  log.IsStreaming,
+		"input_tokens":  log.InputTokens,
+		"output_tokens": log.OutputTokens,
+		"duration_ms":   log.DurationMs,
+		"created_at":    log.CreatedAt,
+		"request_body":  log.RequestBody,
+		"response_body": log.ResponseBody,
 	}
 
-	if targetLog == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Request log not found"})
-		return
+	if log.ErrorMessage != "" {
+		response["error_message"] = log.ErrorMessage
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"log": targetLog,
+		"log": response,
 	})
 }
 

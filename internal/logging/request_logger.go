@@ -172,6 +172,13 @@ func (rl *RequestLogger) GetRequestLogStats(ctx context.Context, opts *RequestLo
 	return stats, nil
 }
 
+// GetRequestLogByID retrieves single request log by ID
+func (rl *RequestLogger) GetRequestLogByID(ctx context.Context, id string) (*ent.RequestLog, error) {
+	return rl.db.RequestLog.Query().
+		Where(requestlog.IDEQ(id)).
+		Only(ctx)
+}
+
 // DeleteOldLogs deletes expired log records
 func (rl *RequestLogger) DeleteOldLogs(ctx context.Context, beforeTime time.Time) error {
 	deleted, err := rl.db.RequestLog.Delete().

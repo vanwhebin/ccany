@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib-x/entsqlite v0.1.3
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
-	github.com/sashabaranov/go-openai v1.40.4
+	github.com/sashabaranov/go-openai v1.40.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.40.0

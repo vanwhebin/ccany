@@ -114,6 +114,9 @@ func (h *EnhancedMessagesHandler) CreateMessage(c *gin.Context) {
 	}
 
 	// Apply intelligent model routing
+	// Update model router with current configuration
+	h.modelRouter.UpdateModelConfiguration(cfg.BigModel, cfg.SmallModel)
+
 	routedModel := h.modelRouter.RouteModel(&claudeReq)
 	if routedModel != claudeReq.Model {
 		h.logger.WithFields(logrus.Fields{

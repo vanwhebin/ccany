@@ -280,3 +280,13 @@ func (r *ModelRouter) LogRoutingDecision(originalModel, routedModel, reason stri
 
 	r.logger.WithFields(fields).Info("Model routing decision")
 }
+
+// UpdateModelConfiguration updates the model configuration dynamically
+func (r *ModelRouter) UpdateModelConfiguration(bigModel, smallModel string) {
+	r.bigModel = bigModel
+	r.smallModel = smallModel
+	r.logger.WithFields(logrus.Fields{
+		"big_model":   bigModel,
+		"small_model": smallModel,
+	}).Info("Updated model router configuration")
+}

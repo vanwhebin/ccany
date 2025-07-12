@@ -44,18 +44,44 @@ cp .env.example .env
 # 所有API和服务配置都通过Web界面管理
 ```
 
-### 3. 启动服务器
+### 3. 使用Docker运行（推荐）
+
+**使用发布的镜像：**
 
 ```bash
-# 直接运行
-go run cmd/server/main.go
+# 使用Docker Hub镜像
+docker run -d -p 8082:8082 \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  czyt/ccany:latest
 
-# 或者构建后运行
-go build -o ccany cmd/server/main.go
-./ccany
+# 或使用GitHub Container Registry镜像
+docker run -d -p 8082:8082 \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  ghcr.io/ca-x/ccany:latest
 ```
 
-### 4. 初始化设置
+**使用Docker Compose（生产环境）：**
+
+```bash
+# 复制环境变量配置
+cp .env.example .env
+# 编辑 .env 文件，设置必要的API密钥
+
+# 使用生产版compose（使用发布的镜像）
+docker-compose -f docker-compose.production.yml up -d
+
+# 或使用完整版compose（包含监控等服务）
+docker-compose up -d
+```
+
+### 4. 本地开发运行
+
+```bash
+# 启动服务器
+go run cmd/server/main.go
+```
+
+### 5. 初始化设置
 
 ```bash
 # 启动服务器后，首次访问需要进行初始化设置
@@ -65,7 +91,7 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh start
 ```
 
-### 5. 配置API密钥
+### 6. 配置API密钥
 
 ```bash
 # 登录Web界面后，在管理面板中配置：

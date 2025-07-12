@@ -30,6 +30,15 @@ type Config struct {
 
 	// Database Configuration
 	DatabaseURL string
+
+	// Proxy Configuration
+	ProxyEnabled          bool
+	ProxyType             string // "http" or "socks5"
+	HTTPProxy             string
+	SOCKS5Proxy           string
+	SOCKS5ProxyUser       string
+	SOCKS5ProxyPassword   string
+	IgnoreSSLVerification bool
 }
 
 // ValidateAPIKey performs basic validation on the API key

@@ -396,6 +396,7 @@ func setupRoutes(router *gin.Engine, messagesHandler *handlers.EnhancedMessagesH
 		admin.PUT("/config/:key", configHandler.UpdateConfig)
 		admin.POST("/config/test", configHandler.TestConfig)
 		admin.POST("/config/test-api-key", configHandler.TestAPIKey)
+		admin.POST("/test-proxy", configHandler.TestProxy)
 		admin.GET("/config/endpoint-url", configHandler.GetFinalEndpointURL)
 
 		// Request logs management

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"ccany/internal/app"
+	"ccany/internal/client"
 	"ccany/internal/config"
 	"ccany/internal/i18n"
 
@@ -854,4 +855,158 @@ func shouldAppendV1ForHandler(baseURL string) bool {
 
 	// Single path segment or simple domain - likely needs /v1
 	return true
+}
+
+// ProxyTestRequest 代理测试请求结构
+type ProxyTestRequest struct {
+	ProxyConfig *struct {
+		Type     string `json:"type"`     // "http" or "socks5"
+		Address  string `json:"address"`  // 代理地址
+		Username string `json:"username"` // SOCKS5用户名（可选）
+		Password string `json:"password"` // SOCKS5密码（可选）
+	} `json:"proxy_config"`
+	TestURL   string `json:"test_url"`   // 测试URL
+	IgnoreSSL bool   `json:"ignore_ssl"` // 是否忽略SSL验证
+}
+
+// ProxyTestResponse 代理测试响应结构
+type ProxyTestResponse struct {
+	Success  bool   `json:"success"`
+	Duration int64  `json:"duration"` // 响应时间（毫秒）
+	IP       string `json:"ip"`       // 获取到的IP地址
+	Error    string `json:"error,omitempty"`
+}
+
+// TestProxy 测试代理连接 - POST /admin/test-proxy
+func (h *ConfigHandler) TestProxy(c *gin.Context) {
+	var req ProxyTestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.WithError(err).Error("Invalid proxy test request")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	if req.ProxyConfig == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Proxy configuration is required",
+		})
+		return
+	}
+
+	if req.TestURL == "" {
+		req.TestURL = "https://httpbin.org/ip"
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"proxy_type":    req.ProxyConfig.Type,
+		"proxy_address": req.ProxyConfig.Address,
+		"test_url":      req.TestURL,
+		"ignore_ssl":    req.IgnoreSSL,
+	}).Info("Testing proxy connection")
+
+	// 创建代理配置
+	proxyConfig := &client.ProxyConfig{
+		Enabled:   true,
+		Type:      req.ProxyConfig.Type,
+		IgnoreSSL: req.IgnoreSSL,
+	}
+
+	if req.ProxyConfig.Type == "http" {
+		proxyConfig.HTTPProxy = req.ProxyConfig.Address
+	} else if req.ProxyConfig.Type == "socks5" {
+		proxyConfig.SOCKS5Proxy = req.ProxyConfig.Address
+		proxyConfig.SOCKS5ProxyUser = req.ProxyConfig.Username
+		proxyConfig.SOCKS5ProxyPassword = req.ProxyConfig.Password
+	}
+
+	// 测试代理连接
+	result := h.testProxyConnection(proxyConfig, req.TestURL)
+
+	if result.Success {
+		c.JSON(http.StatusOK, result)
+	} else {
+		c.JSON(http.StatusBadRequest, result)
+	}
+}
+
+// testProxyConnection 测试代理连接
+func (h *ConfigHandler) testProxyConnection(proxyConfig *client.ProxyConfig, testURL string) ProxyTestResponse {
+	startTime := time.Now()
+
+	// 使用代理配置构建HTTP传输
+	transport := client.BuildHTTPTransport(proxyConfig)
+
+	// 创建HTTP客户端
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}
+
+	// 发送请求
+	resp, err := httpClient.Get(testURL)
+	if err != nil {
+		h.logger.WithError(err).Error("Proxy test request failed")
+		return ProxyTestResponse{
+			Success: false,
+			Error:   fmt.Sprintf("请求失败: %v", err),
+		}
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			h.logger.WithError(err).Error("Failed to close response body")
+		}
+	}()
+
+	duration := time.Since(startTime).Milliseconds()
+
+	// 读取响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to read response body")
+		return ProxyTestResponse{
+			Success:  false,
+			Duration: duration,
+			Error:    fmt.Sprintf("读取响应失败: %v", err),
+		}
+	}
+
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		h.logger.WithField("status_code", resp.StatusCode).Error("Non-OK response status")
+		return ProxyTestResponse{
+			Success:  false,
+			Duration: duration,
+			Error:    fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body)),
+		}
+	}
+
+	// 尝试解析IP地址（如果是httpbin.org/ip的话）
+	var ipResponse struct {
+		Origin string `json:"origin"`
+	}
+
+	var detectedIP string
+	if err := json.Unmarshal(body, &ipResponse); err == nil && ipResponse.Origin != "" {
+		detectedIP = ipResponse.Origin
+	} else {
+		// 如果不是JSON格式，尝试提取IP
+		bodyStr := string(body)
+		if strings.Contains(bodyStr, ".") {
+			detectedIP = strings.TrimSpace(bodyStr)
+		}
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"duration":    duration,
+		"detected_ip": detectedIP,
+		"status":      resp.StatusCode,
+	}).Info("Proxy test completed successfully")
+
+	return ProxyTestResponse{
+		Success:  true,
+		Duration: duration,
+		IP:       detectedIP,
+	}
 }

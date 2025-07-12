@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -22,8 +23,13 @@ type OpenAIClient struct {
 	logger  *logrus.Logger
 }
 
-// NewOpenAIClient creates a new OpenAI client using the official SDK
+// NewOpenAIClient creates a new OpenAI client using the official SDK with proxy support
 func NewOpenAIClient(apiKey, baseURL string, timeout int, logger *logrus.Logger) *OpenAIClient {
+	return NewOpenAIClientWithProxy(apiKey, baseURL, timeout, nil, logger)
+}
+
+// NewOpenAIClientWithProxy creates a new OpenAI client with proxy support
+func NewOpenAIClientWithProxy(apiKey, baseURL string, timeout int, proxyConfig *ProxyConfig, logger *logrus.Logger) *OpenAIClient {
 	config := openai.DefaultConfig(apiKey)
 	if baseURL != "" && baseURL != "https://api.openai.com/v1" {
 		// For custom base URLs, we need to handle the path construction carefully
@@ -39,6 +45,22 @@ func NewOpenAIClient(apiKey, baseURL string, timeout int, logger *logrus.Logger)
 			"constructed_base_url": finalBaseURL,
 			"final_endpoint":       finalBaseURL + "/chat/completions",
 		}).Info("OpenAI client URL construction")
+	}
+
+	// Configure proxy if provided
+	if proxyConfig != nil && proxyConfig.Enabled {
+		transport := BuildHTTPTransport(proxyConfig)
+		httpClient := &http.Client{
+			Transport: transport,
+		}
+
+		logger.WithFields(logrus.Fields{
+			"proxy_enabled": proxyConfig.Enabled,
+			"proxy_type":    proxyConfig.Type,
+			"ignore_ssl":    proxyConfig.IgnoreSSL,
+		}).Info("OpenAI client configured with proxy")
+
+		config.HTTPClient = httpClient
 	}
 
 	client := openai.NewClientWithConfig(config)

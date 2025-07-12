@@ -44,18 +44,44 @@ cp .env.example .env
 # All API and service configurations are managed through the web interface
 ```
 
-### 3. Start the Server
+### 3. Run with Docker (Recommended)
+
+**Using published images:**
 
 ```bash
-# Run directly
-go run cmd/server/main.go
+# Using Docker Hub image
+docker run -d -p 8082:8082 \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  czyt/ccany:latest
 
-# Or build and run
-go build -o ccany cmd/server/main.go
-./ccany
+# Or using GitHub Container Registry image
+docker run -d -p 8082:8082 \
+  -e OPENAI_API_KEY=your_openai_api_key \
+  ghcr.io/ca-x/ccany:latest
 ```
 
-### 4. Initial Setup
+**Using Docker Compose (Production):**
+
+```bash
+# Copy environment configuration
+cp .env.example .env
+# Edit .env file to set required API keys
+
+# Use production compose (with published images)
+docker-compose -f docker-compose.production.yml up -d
+
+# Or use full compose (includes monitoring services)
+docker-compose up -d
+```
+
+### 4. Local Development
+
+```bash
+# Start server
+go run cmd/server/main.go
+```
+
+### 5. Initial Setup
 
 ```bash
 # After starting the server, initial setup is required for first access
@@ -65,7 +91,7 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh start
 ```
 
-### 5. Configure API Keys
+### 6. Configure API Keys
 
 ```bash
 # After logging into the web interface, configure in the management panel:
@@ -75,13 +101,13 @@ chmod +x scripts/deploy.sh
 # - Performance parameters
 ```
 
-### 6. Use Claude Code
+### 7. Use Claude Code
 
 ```bash
 ANTHROPIC_BASE_URL=http://localhost:8082 ANTHROPIC_AUTH_TOKEN="some-api-key" claude
 ```
 
-### 7. Access Web Interface
+### 8. Access Web Interface
 
 Open your browser and visit `http://localhost:8082` to view the management panel.
 

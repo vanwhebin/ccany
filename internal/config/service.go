@@ -44,6 +44,14 @@ const (
 	KeyStreamEnabled   = "stream_enabled"
 	KeyRateLimitRPM    = "rate_limit_rpm"
 	KeyRateLimitTPM    = "rate_limit_tpm"
+	// 代理配置键
+	KeyProxyEnabled          = "proxy_enabled"
+	KeyProxyType             = "proxy_type"
+	KeyHTTPProxy             = "http_proxy"
+	KeySOCKS5Proxy           = "socks5_proxy"
+	KeySOCKS5ProxyUser       = "socks5_proxy_user"
+	KeySOCKS5ProxyPassword   = "socks5_proxy_password"
+	KeyIgnoreSSLVerification = "ignore_ssl_verification"
 )
 
 // GetConfig gets configuration value

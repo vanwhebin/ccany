@@ -227,10 +227,26 @@
 
                     <div class="table-container">
                         <div class="table-header">
-                            <div class="search-box">
-                                <input type="text" placeholder="搜索请求..." id="searchInput"
-                                    data-i18n-placeholder="requests.search_placeholder">
-                                <button class="btn btn-secondary search-btn">🔍</button>
+                            <div class="search-container">
+                                <div class="search-box">
+                                    <input type="text" placeholder="搜索请求..." id="searchInput"
+                                        data-i18n-placeholder="requests.search_placeholder">
+                                    <div class="search-icon" id="searchBtn">
+                                        <svg t="1752296469134" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M672.438 352C790.22 352 885.7 447.516 885.7 565.333c0 52.862-19.22 101.233-51.052 138.503l127.065 128.033c12.45 12.544 12.373 32.805-0.171 45.255-12.42 12.325-32.401 12.373-44.88 0.2l-0.375-0.372L786.16 745.837c-32.915 20.795-71.914 32.83-113.722 32.83-117.784 0-213.263-95.516-213.263-213.334C459.175 447.516 554.654 352 672.437 352zM320.575 821.333c17.673 0 32 14.327 32 32 0 17.497-14.042 31.713-31.47 31.996l-0.53 0.004H86c-17.673 0-32-14.327-32-32 0-17.496 14.042-31.713 31.47-31.995l0.53-0.005h234.575z m0-341.333c17.673 0 32 14.327 32 32 0 17.496-14.042 31.713-31.47 31.996l-0.53 0.004H86c-17.673 0-32-14.327-32-32 0-17.496 14.042-31.713 31.47-31.996L86 480h234.575zM939 138.667c17.673 0 32 14.327 32 32 0 17.496-14.042 31.713-31.47 31.995l-0.53 0.005H86c-17.673 0-32-14.327-32-32 0-17.497 14.042-31.713 31.47-31.996l0.53-0.004h853z" fill="currentColor"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="date-range-container">
+                                    <div class="date-input-group">
+                                        <label data-i18n="requests.start_time">开始时间</label>
+                                        <input type="datetime-local" id="startTime" class="date-input">
+                                    </div>
+                                    <div class="date-input-group">
+                                        <label data-i18n="requests.end_time">结束时间</label>
+                                        <input type="datetime-local" id="endTime" class="date-input">
+                                    </div>
+                                </div>
                             </div>
                             <button class="btn btn-primary refresh-btn" id="refreshLogs" data-i18n="requests.refresh">刷新</button>
                         </div>
@@ -375,6 +391,82 @@
                                         <input type="number" id="requestTimeout" placeholder="90"
                                             data-i18n-placeholder="config.request_timeout_placeholder">
                                         <div class="form-hint" data-i18n="config.request_timeout_hint">API请求的超时时间</div>
+                                    </div>
+                                </div>
+
+                                <div class="config-subsection">
+                                    <h4 data-i18n="config.proxy_settings">代理设置</h4>
+                                    <div class="form-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="proxyEnabled">
+                                            <span data-i18n="config.enable_proxy">启用代理</span>
+                                        </label>
+                                        <div class="form-hint" data-i18n="config.proxy_config_desc">配置HTTP或SOCKS5代理以访问API服务</div>
+                                    </div>
+                                    
+                                    <div class="proxy-config-section" id="proxyConfigSection" style="display: none;">
+                                        <div class="form-group">
+                                            <label data-i18n="config.proxy_type">代理类型</label>
+                                            <select id="proxyType">
+                                                <option value="http" data-i18n="config.proxy_type_http">HTTP代理</option>
+                                                <option value="socks5" data-i18n="config.proxy_type_socks5">SOCKS5代理</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="proxy-type-config" id="httpProxyConfig">
+                                            <div class="form-group">
+                                                <label data-i18n="config.http_proxy">HTTP代理地址</label>
+                                                <input type="text" id="httpProxy" placeholder="http://proxy.example.com:8080"
+                                                    data-i18n-placeholder="config.http_proxy_placeholder">
+                                                <div class="form-hint" data-i18n="config.http_proxy_hint">HTTP代理服务器地址，格式：http://host:port</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="proxy-type-config" id="socks5ProxyConfig" style="display: none;">
+                                            <div class="form-group">
+                                                <label data-i18n="config.socks5_proxy">SOCKS5代理地址</label>
+                                                <input type="text" id="socks5Proxy" placeholder="proxy.example.com:1080"
+                                                    data-i18n-placeholder="config.socks5_proxy_placeholder">
+                                                <div class="form-hint" data-i18n="config.socks5_proxy_hint">SOCKS5代理服务器地址，格式：host:port</div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label data-i18n="config.socks5_username">SOCKS5用户名</label>
+                                                <input type="text" id="socks5Username" placeholder="用户名（可选）"
+                                                    data-i18n-placeholder="config.socks5_username_placeholder">
+                                                <div class="form-hint" data-i18n="config.socks5_username_hint">SOCKS5代理的用户名（如果需要认证）</div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label data-i18n="config.socks5_password">SOCKS5密码</label>
+                                                <input type="password" id="socks5Password" placeholder="密码（可选）"
+                                                    data-i18n-placeholder="config.socks5_password_placeholder">
+                                                <div class="form-hint" data-i18n="config.socks5_password_hint">SOCKS5代理的密码（如果需要认证）</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="ignoreSSL">
+                                                <span data-i18n="config.ignore_ssl">忽略SSL验证</span>
+                                            </label>
+                                            <div class="form-hint" data-i18n="config.ignore_ssl_hint">跳过SSL证书验证（仅在测试环境使用）</div>
+                                        </div>
+                                        
+                                        <div class="proxy-test-section" id="proxyTestSection" style="display: none;">
+                                            <div class="form-group">
+                                                <label data-i18n="config.proxy_test_url">测试URL</label>
+                                                <div class="input-with-button">
+                                                    <input type="text" id="proxyTestUrl" placeholder="https://httpbin.org/ip" value="https://httpbin.org/ip">
+                                                    <div class="test-proxy-icon" id="testProxyBtn" title="测试代理连接" data-i18n-title="config.test_proxy">
+                                                        <svg t="1752298172749" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                                                            <path d="M894.424364 729.008452c-53.43705-151.726633-194.117093-258.544451-354.425171-269.737374v-64.9912c87.777159-13.472849 155.219177-89.505523 155.219177-180.992167 0-100.968599-82.144882-183.113481-183.113481-183.113481s-183.113481 82.144882-183.113481 183.113481c0 91.487667 67.442018 167.518295 155.219177 180.992167v64.9912c-160.309102 11.1919-300.993239 118.007671-354.429265 269.728165-71.986521 2.539846-129.764436 61.880349-129.764435 134.475737 0 74.204026 60.365856 134.569882 134.569881 134.569882s134.569882-60.365856 134.569882-134.569882c0-56.175417-34.600029-104.409978-83.604117-124.537388 47.802726-125.075647 165.031661-212.908064 298.657031-223.73362v216.59299c-60.916395 12.8384-106.784048 66.997903-106.784048 131.679041 0 74.204026 60.365856 134.569882 134.569881 134.569882s134.569882-60.365856 134.569882-134.569882c0-64.603367-45.759183-118.709659-106.567108-131.630946v-216.640062c133.584438 10.82351 250.799046 98.622158 298.622238 223.657896-49.101301 20.082384-83.787288 68.36811-83.787288 124.613112 0 74.204026 60.365856 134.569882 134.569882 134.569882s134.569882-60.365856 134.569881-134.569882c0.001023-72.523757-57.662281-131.818211-129.548518-134.467551z m-681.057347 134.466528c0 43.435255-35.344996 78.780251-78.780251 78.780251s-78.780251-35.344996-78.780251-78.780251 35.344996-78.780251 78.780251-78.780251c3.151783 0 6.255471 0.206708 9.312087 0.569982 1.287319 0.277316 2.577708 0.459464 3.859911 0.553608 37.184901 6.288217 65.608254 38.71065 65.608253 77.656661z m171.412998-650.186246c0-70.214155 57.110719-127.32385 127.323851-127.32385s127.32385 57.110719 127.32385 127.32385c0 70.214155-57.110719 127.32385-127.32385 127.323851s-127.32385-57.109696-127.323851-127.323851z m205.996654 650.186246c0 43.435255-35.344996 78.780251-78.780251 78.780251-43.435255 0-78.780251-35.344996-78.780251-78.780251s35.344996-78.780251 78.780251-78.780251c43.434232 0 78.780251 35.343973 78.780251 78.780251z m298.627355 78.781274c-43.435255 0-78.780251-35.344996-78.780251-78.780251 0-39.041178 28.561499-71.529103 65.880453-77.706803a28.15627 28.15627 0 0 0 3.627621-0.510629 79.109756 79.109756 0 0 1 9.272177-0.563842c43.435255 0 78.780251 35.344996 78.780251 78.780251 0.002047 43.435255-35.343973 78.781274-78.780251 78.781274z" fill="currentColor"></path>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                <div class="form-hint">测试代理连接是否正常工作</div>
+                                            </div>
+                                            
+                                            <div class="proxy-test-result" id="proxyTestResult" style="display: none;"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -713,6 +805,19 @@ claude</code></pre>
                         <button type="submit" class="btn btn-primary save-btn" data-i18n="users.save">保存</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- 请求详情模态框 -->
+        <div class="modal" id="requestDetailsModal">
+            <div class="modal-content request-details-modal">
+                <div class="modal-header">
+                    <h3 id="requestDetailsTitle" data-i18n="requests.details_title">请求详情</h3>
+                    <button class="btn btn-secondary close-btn" id="closeRequestDetailsModal">&times;</button>
+                </div>
+                <div class="request-details-content" id="requestDetailsContent">
+                    <div class="loading" data-i18n="requests.loading_details">加载详情中...</div>
+                </div>
             </div>
         </div>
     </div>

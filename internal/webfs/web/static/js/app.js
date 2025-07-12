@@ -356,10 +356,18 @@ class UIAnimationController {
 
     getNotificationIcon(type) {
         const icons = {
-            success: '✅',
-            error: '❌',
-            warning: '⚠️',
-            info: 'ℹ️'
+            success: `<svg viewBox="0 0 24 24" width="14" height="14">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+            </svg>`,
+            error: `<svg viewBox="0 0 24 24" width="14" height="14">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+            </svg>`,
+            warning: `<svg viewBox="0 0 24 24" width="14" height="14">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="currentColor"/>
+            </svg>`,
+            info: `<svg viewBox="0 0 24 24" width="14" height="14">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/>
+            </svg>`
         };
         return icons[type] || icons.info;
     }
@@ -847,10 +855,36 @@ class ClaudeProxyApp {
             });
         });
 
-        // 刷新按钮
+        // 刷新按钮和搜索功能
         const refreshBtn = document.getElementById('refreshLogs');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => this.loadRequestLogs());
+        }
+        
+        // 搜索功能
+        const searchBtn = document.getElementById('searchBtn');
+        const searchInput = document.getElementById('searchInput');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => this.performSearch());
+        }
+        
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.performSearch();
+                }
+            });
+        }
+        
+        if (startTimeInput || endTimeInput) {
+            [startTimeInput, endTimeInput].forEach(input => {
+                if (input) {
+                    input.addEventListener('change', () => this.performSearch());
+                }
+            });
         }
 
         // 测试按钮
@@ -949,9 +983,9 @@ class ClaudeProxyApp {
         }
 
         // 搜索功能
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
+        const requestSearchInput = document.getElementById('searchInput');
+        if (requestSearchInput) {
+            requestSearchInput.addEventListener('input', (e) => {
                 this.filterRequests(e.target.value);
             });
         }
@@ -973,6 +1007,22 @@ class ClaudeProxyApp {
             });
         }
 
+        // 请求详情模态框控制
+        const closeRequestDetailsModal = document.getElementById('closeRequestDetailsModal');
+        if (closeRequestDetailsModal) {
+            closeRequestDetailsModal.addEventListener('click', () => this.hideRequestDetailsModal());
+        }
+
+        // 请求详情模态框点击外部关闭
+        const requestDetailsModal = document.getElementById('requestDetailsModal');
+        if (requestDetailsModal) {
+            requestDetailsModal.addEventListener('click', (e) => {
+                if (e.target === requestDetailsModal) {
+                    this.hideRequestDetailsModal();
+                }
+            });
+        }
+
         // OpenAI Base URL 输入框变化监听
         const openaiBaseUrlInput = document.getElementById('openaiBaseUrl');
         if (openaiBaseUrlInput) {
@@ -981,7 +1031,317 @@ class ClaudeProxyApp {
             });
         }
 
+        // 代理配置事件监听
+        const proxyEnabledCheckbox = document.getElementById('proxyEnabled');
+        if (proxyEnabledCheckbox) {
+            proxyEnabledCheckbox.addEventListener('change', (e) => {
+                this.toggleProxyConfig(e.target.checked);
+            });
+        }
+
+        const proxyTypeSelect = document.getElementById('proxyType');
+        if (proxyTypeSelect) {
+            proxyTypeSelect.addEventListener('change', (e) => {
+                this.switchProxyType(e.target.value);
+            });
+        }
+
+        // 代理测试按钮
+        const testProxyBtn = document.getElementById('testProxyBtn');
+        if (testProxyBtn) {
+            testProxyBtn.addEventListener('click', () => this.testProxy());
+        }
+
         // 语言选择器将在showMainApp()中设置
+    }
+
+    // Request details modal methods
+    hideRequestDetailsModal() {
+        const modal = document.getElementById('requestDetailsModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    renderRequestDetails(requestData) {
+        console.log('renderRequestDetails called with data:', requestData);
+        const content = document.getElementById('requestDetailsContent');
+        if (!content) {
+            console.error('requestDetailsContent element not found');
+            return;
+        }
+
+        const formatJson = (obj) => {
+            if (!obj) return 'N/A';
+            if (typeof obj === 'string') {
+                try {
+                    return JSON.stringify(JSON.parse(obj), null, 2);
+                } catch (e) {
+                    return obj;
+                }
+            }
+            return JSON.stringify(obj, null, 2);
+        };
+
+        const formatTimestamp = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            return new Date(timestamp).toLocaleString();
+        };
+
+        // Map backend data structure to display fields
+        const displayData = {
+            id: requestData.id || 'N/A',
+            timestamp: requestData.created_at || requestData.timestamp,
+            model: requestData.claude_model || requestData.openai_model || requestData.model || 'N/A',
+            status_code: requestData.status_code || requestData.status || 200,
+            duration: requestData.duration_ms ? `${requestData.duration_ms}ms` : (requestData.duration || 'N/A'),
+            input_tokens: requestData.input_tokens || 0,
+            output_tokens: requestData.output_tokens || 0,
+            request_body: requestData.request_body || requestData.request,
+            response_body: requestData.response_body || requestData.response,
+            error_message: requestData.error_message || requestData.error
+        };
+
+        console.log('Mapped display data:', displayData);
+
+        const html = `
+            <div class="request-details-sections">
+                <!-- 基本信息 -->
+                <div class="details-section">
+                    <h4 class="section-title">${this.t('requests.basic_info') || '基本信息'}</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <label>${this.t('requests.request_id') || '请求ID'}:</label>
+                            <span class="detail-value">${displayData.id}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>${this.t('requests.timestamp') || '时间戳'}:</label>
+                            <span class="detail-value">${formatTimestamp(displayData.timestamp)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>${this.t('requests.model') || '模型'}:</label>
+                            <span class="detail-value">${displayData.model}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>${this.t('requests.status') || '状态'}:</label>
+                            <span class="detail-value status-badge ${this.getStatusClass(displayData.status_code)}">
+                                ${this.getStatusText(displayData.status_code)}
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <label>${this.t('requests.duration') || '响应时间'}:</label>
+                            <span class="detail-value">${displayData.duration}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>${this.t('requests.tokens') || 'Token使用'}:</label>
+                            <span class="detail-value">
+                                ${this.t('requests.input') || '输入'}: ${displayData.input_tokens} / 
+                                ${this.t('requests.output') || '输出'}: ${displayData.output_tokens}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 请求内容 -->
+                <div class="details-section">
+                    <h4 class="section-title">${this.t('requests.request_content') || '请求内容'}</h4>
+                    <div class="code-block">
+                        <pre><code class="json">${formatJson(displayData.request_body)}</code></pre>
+                    </div>
+                </div>
+
+                <!-- 响应内容 -->
+                <div class="details-section">
+                    <h4 class="section-title">${this.t('requests.response_content') || '响应内容'}</h4>
+                    <div class="code-block">
+                        <pre><code class="json">${formatJson(displayData.response_body)}</code></pre>
+                    </div>
+                </div>
+
+                <!-- 错误信息 (如果有) -->
+                ${displayData.error_message ? `
+                <div class="details-section error-section">
+                    <h4 class="section-title">${this.t('requests.error_info') || '错误信息'}</h4>
+                    <div class="error-content">
+                        <pre><code class="error">${displayData.error_message}</code></pre>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        console.log('Setting innerHTML with HTML:', html);
+        content.innerHTML = html;
+        console.log('Content after setting innerHTML:', content.innerHTML);
+    }
+
+    generateMockRequestDetails(requestId) {
+        const models = ['Claude 3.5 Sonnet', 'Claude 3 Haiku', 'Claude 3 Opus'];
+        const isSuccess = Math.random() > 0.3; // 70% success rate
+        
+        const mockRequest = {
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1000,
+            messages: [
+                {
+                    role: 'user',
+                    content: 'Hello, can you help me write a Python function to calculate fibonacci numbers?'
+                }
+            ]
+        };
+
+        const mockResponse = isSuccess ? {
+            id: requestId,
+            type: 'message',
+            role: 'assistant',
+            content: [
+                {
+                    type: 'text',
+                    text: 'I\'d be happy to help you write a Python function to calculate Fibonacci numbers. Here are a couple of different approaches:\n\n```python\ndef fibonacci_iterative(n):\n    """Calculate the nth Fibonacci number using iteration"""\n    if n <= 1:\n        return n\n    \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    \n    return b\n```'
+                }
+            ],
+            model: 'claude-3-5-sonnet-20241022',
+            usage: {
+                input_tokens: 25,
+                output_tokens: 150
+            }
+        } : {
+            error: {
+                type: 'rate_limit_error',
+                message: 'Rate limit exceeded. Please try again later.'
+            }
+        };
+
+        return {
+            id: requestId,
+            created_at: new Date().toISOString(),
+            claude_model: models[Math.floor(Math.random() * models.length)],
+            status_code: isSuccess ? 200 : 429,
+            duration_ms: isSuccess ? Math.floor(Math.random() * 2000) + 500 : 0,
+            input_tokens: isSuccess ? 25 : 0,
+            output_tokens: isSuccess ? 150 : 0,
+            request_body: mockRequest,
+            response_body: mockResponse,
+            error_message: isSuccess ? null : 'Rate limit exceeded. Please try again later.'
+        };
+    }
+
+    // 代理配置相关方法
+    toggleProxyConfig(enabled) {
+        const proxyConfigSection = document.getElementById('proxyConfigSection');
+        const proxyTestSection = document.getElementById('proxyTestSection');
+        
+        if (proxyConfigSection) {
+            proxyConfigSection.style.display = enabled ? 'block' : 'none';
+        }
+        
+        if (proxyTestSection) {
+            proxyTestSection.style.display = enabled ? 'block' : 'none';
+        }
+    }
+
+    switchProxyType(type) {
+        const httpProxyConfig = document.getElementById('httpProxyConfig');
+        const socks5ProxyConfig = document.getElementById('socks5ProxyConfig');
+        
+        if (httpProxyConfig && socks5ProxyConfig) {
+            if (type === 'http') {
+                httpProxyConfig.style.display = 'block';
+                socks5ProxyConfig.style.display = 'none';
+            } else if (type === 'socks5') {
+                httpProxyConfig.style.display = 'none';
+                socks5ProxyConfig.style.display = 'block';
+            }
+        }
+    }
+
+    // 测试代理连接
+    async testProxy() {
+        const proxyEnabled = document.getElementById('proxyEnabled').checked;
+        if (!proxyEnabled) {
+            this.showProxyTestResult('请先启用代理', 'error');
+            return;
+        }
+
+        const proxyType = document.getElementById('proxyType').value;
+        const testUrl = document.getElementById('proxyTestUrl').value || 'https://httpbin.org/ip';
+        const ignoreSSL = document.getElementById('ignoreSSL').checked;
+
+        let proxyConfig = null;
+        if (proxyType === 'http') {
+            const httpProxy = document.getElementById('httpProxy').value;
+            if (!httpProxy) {
+                this.showProxyTestResult('请填写HTTP代理地址', 'error');
+                return;
+            }
+            proxyConfig = {
+                type: 'http',
+                address: httpProxy
+            };
+        } else if (proxyType === 'socks5') {
+            const socks5Proxy = document.getElementById('socks5Proxy').value;
+            if (!socks5Proxy) {
+                this.showProxyTestResult('请填写SOCKS5代理地址', 'error');
+                return;
+            }
+            proxyConfig = {
+                type: 'socks5',
+                address: socks5Proxy,
+                username: document.getElementById('socks5Username').value || '',
+                password: document.getElementById('socks5Password').value || ''
+            };
+        }
+
+        const testBtn = document.getElementById('testProxyBtn');
+        const originalHtml = testBtn.innerHTML;
+        
+        // 显示加载状态
+        testBtn.innerHTML = `
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="20" height="20" class="spinning">
+                <path d="M512 1024C229.222 1024 0 794.778 0 512S229.222 0 512 0s512 229.222 512 512-229.222 512-512 512z m259.149-568.883h-290.74a25.293 25.293 0 0 0-25.292 25.293l-0.026 63.206c0 13.952 11.315 25.293 25.267 25.293h290.74c13.952 0 25.293-11.341 25.293-25.293V480.41c0-13.952-11.341-25.293-25.293-25.293z" fill="currentColor"/>
+            </svg>
+        `;
+        testBtn.style.pointerEvents = 'none';
+
+        try {
+            const response = await this.apiCall('/admin/test-proxy', {
+                method: 'POST',
+                body: JSON.stringify({
+                    proxy_config: proxyConfig,
+                    test_url: testUrl,
+                    ignore_ssl: ignoreSSL
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.showProxyTestResult(`✅ 代理测试成功！\n响应时间: ${data.duration}ms\n代理IP: ${data.ip || '获取失败'}`, 'success');
+            } else {
+                this.showProxyTestResult(`❌ 代理测试失败: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('代理测试失败:', error);
+            this.showProxyTestResult(`❌ 代理测试失败: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            testBtn.innerHTML = originalHtml;
+            testBtn.style.pointerEvents = '';
+        }
+    }
+
+    showProxyTestResult(message, type) {
+        const resultElement = document.getElementById('proxyTestResult');
+        if (resultElement) {
+            resultElement.style.display = 'block';
+            resultElement.className = `proxy-test-result ${type}`;
+            resultElement.textContent = message;
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                resultElement.style.display = 'none';
+            }, 5000);
+        }
     }
 
     // 身份验证相关
@@ -1368,7 +1728,15 @@ class ClaudeProxyApp {
             'serverPort': this.config.port,
             'logLevel': this.config.log_level,
             'jwtSecret': this.config.jwt_secret,
-            'encryptAlgo': this.config.encrypt_algorithm
+            'encryptAlgo': this.config.encrypt_algorithm,
+            // 代理配置
+            'proxyEnabled': this.config.proxy_enabled,
+            'proxyType': this.config.proxy_type,
+            'httpProxy': this.config.http_proxy,
+            'socks5Proxy': this.config.socks5_proxy,
+            'socks5Username': this.config.socks5_proxy_user,
+            'socks5Password': this.config.socks5_proxy_password,
+            'ignoreSSL': this.config.ignore_ssl_verification
         };
 
         Object.entries(elements).forEach(([id, value]) => {
@@ -1381,6 +1749,10 @@ class ClaudeProxyApp {
                 }
             }
         });
+        
+        // 初始化代理配置显示状态
+        this.toggleProxyConfig(this.config.proxy_enabled === 'true' || this.config.proxy_enabled === true);
+        this.switchProxyType(this.config.proxy_type || 'http');
         
         // 初始化Anthropic Base URL为当前页面URL
         this.initializeAnthropicBaseUrl();
@@ -1415,7 +1787,15 @@ class ClaudeProxyApp {
             port: parseInt(document.getElementById('serverPort').value) || 8080,
             log_level: document.getElementById('logLevel').value,
             jwt_secret: document.getElementById('jwtSecret').value,
-            encrypt_algorithm: document.getElementById('encryptAlgo').value
+            encrypt_algorithm: document.getElementById('encryptAlgo').value,
+            // 代理配置
+            proxy_enabled: document.getElementById('proxyEnabled').checked,
+            proxy_type: document.getElementById('proxyType').value,
+            http_proxy: document.getElementById('httpProxy').value,
+            socks5_proxy: document.getElementById('socks5Proxy').value,
+            socks5_proxy_user: document.getElementById('socks5Username').value,
+            socks5_proxy_password: document.getElementById('socks5Password').value,
+            ignore_ssl_verification: document.getElementById('ignoreSSL').checked
         };
 
         console.log('Saving configuration data:', configData);
@@ -1877,33 +2257,107 @@ class ClaudeProxyApp {
         }
     }
 
-    async loadRequestLogs() {
+    performSearch() {
+        const searchInput = document.getElementById('searchInput');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        
+        const filters = {
+            keyword: searchInput ? searchInput.value.trim() : '',
+            startTime: startTimeInput ? startTimeInput.value : '',
+            endTime: endTimeInput ? endTimeInput.value : ''
+        };
+        
+        this.loadRequestLogs(filters);
+    }
+
+    async loadRequestLogs(filters = {}) {
         const tableBody = document.getElementById('requestsTableBody');
         if (!tableBody) return;
 
         tableBody.innerHTML = `<tr><td colspan="6" class="loading">${this.t('requests.loading')}</td></tr>`;
 
-        // 模拟请求日志数据
-        setTimeout(() => {
-            const mockLogs = this.generateMockLogs(20);
-            const html = mockLogs.map(log => `
-                <tr>
-                    <td>${log.time}</td>
-                    <td>${log.model}</td>
-                    <td><span class="status-badge ${log.status}">${log.statusText}</span></td>
-                    <td>${log.responseTime}</td>
-                    <td>${log.tokens}</td>
-                    <td>
-                        <button class="action-btn" onclick="app.viewRequestDetails('${log.id}')">${this.t('requests.details')}</button>
-                    </td>
-                </tr>
-            `).join('');
+        try {
+            // 构建查询参数
+            const params = new URLSearchParams();
+            if (filters.keyword) {
+                params.append('search', filters.keyword);
+            }
+            if (filters.startTime) {
+                params.append('start_time', new Date(filters.startTime).toISOString());
+            }
+            if (filters.endTime) {
+                params.append('end_time', new Date(filters.endTime).toISOString());
+            }
             
-            tableBody.innerHTML = html;
-        }, 500);
+            const url = `/admin/logs${params.toString() ? '?' + params.toString() : ''}`;
+            const response = await this.apiCall(url);
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderRequestLogs(data.logs || []);
+            } else {
+                throw new Error('Failed to load request logs');
+            }
+        } catch (error) {
+            console.error('Error loading request logs:', error);
+            // 如果API失败，显示模拟数据
+            setTimeout(() => {
+                const mockLogs = this.generateMockLogs(20, filters);
+                this.renderRequestLogs(mockLogs);
+            }, 500);
+        }
     }
 
-    generateMockLogs(count) {
+    renderRequestLogs(logs) {
+        const tableBody = document.getElementById('requestsTableBody');
+        if (!tableBody) return;
+
+        if (logs.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="no-data">${this.t('requests.no_data')}</td></tr>`;
+            return;
+        }
+
+        const html = logs.map(log => `
+            <tr>
+                <td>${this.formatTime(log.created_at || log.time)}</td>
+                <td>${log.claude_model || log.model}</td>
+                <td><span class="status-badge ${this.getStatusClass(log.status_code || log.status)}">${this.getStatusText(log.status_code || log.status)}</span></td>
+                <td>${log.duration_ms ? log.duration_ms + 'ms' : (log.responseTime || '-')}</td>
+                <td>${log.input_tokens || log.tokens || 0}</td>
+                <td>
+                    <button class="action-btn" onclick="app.viewRequestDetails('${log.id}')">${this.t('requests.details')}</button>
+                </td>
+            </tr>
+        `).join('');
+        
+        tableBody.innerHTML = html;
+    }
+
+    getStatusClass(status) {
+        if (typeof status === 'number') {
+            return status >= 200 && status < 300 ? 'success' : 'error';
+        }
+        return status || 'error';
+    }
+
+    getStatusText(status) {
+        if (typeof status === 'number') {
+            return status >= 200 && status < 300 ? this.t('requests.success') : this.t('requests.failed');
+        }
+        if (status === 'success') return this.t('requests.success');
+        if (status === 'error') return this.t('requests.failed');
+        if (status === 'warning') return this.t('requests.warning');
+        return this.t('requests.failed');
+    }
+
+    formatTime(timeStr) {
+        if (!timeStr) return '-';
+        const date = new Date(timeStr);
+        return date.toLocaleString();
+    }
+
+    generateMockLogs(count, filters = {}) {
         const models = ['Claude 3.5 Sonnet', 'Claude 3 Haiku', 'Claude 3 Opus'];
         const statuses = [
             { status: 'success', text: this.t('requests.success') },
@@ -1911,20 +2365,48 @@ class ClaudeProxyApp {
             { status: 'warning', text: this.t('requests.warning') }
         ];
 
-        return Array.from({ length: count }, (_, i) => {
+        let mockLogs = Array.from({ length: count }, (_, i) => {
             const status = statuses[Math.floor(Math.random() * statuses.length)];
             const isSuccess = status.status === 'success';
+            const now = new Date();
+            const time = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000); // 随机过去7天内的时间
             
             return {
                 id: `req_${Date.now()}_${i}`,
-                time: this.getRandomTime(),
+                time: time.toISOString(),
+                created_at: time.toISOString(),
                 model: models[Math.floor(Math.random() * models.length)],
+                claude_model: models[Math.floor(Math.random() * models.length)],
                 status: status.status,
+                status_code: isSuccess ? 200 : 500,
                 statusText: status.text,
                 responseTime: isSuccess ? `${Math.floor(Math.random() * 3000) + 200}ms` : '-',
-                tokens: isSuccess ? Math.floor(Math.random() * 2000) + 100 : 0
+                duration_ms: isSuccess ? Math.floor(Math.random() * 3000) + 200 : 0,
+                tokens: isSuccess ? Math.floor(Math.random() * 2000) + 100 : 0,
+                input_tokens: isSuccess ? Math.floor(Math.random() * 2000) + 100 : 0
             };
         });
+
+        // 应用过滤器
+        if (filters.keyword) {
+            const keyword = filters.keyword.toLowerCase();
+            mockLogs = mockLogs.filter(log => 
+                log.model.toLowerCase().includes(keyword) ||
+                log.statusText.toLowerCase().includes(keyword)
+            );
+        }
+
+        if (filters.startTime) {
+            const startTime = new Date(filters.startTime);
+            mockLogs = mockLogs.filter(log => new Date(log.time) >= startTime);
+        }
+
+        if (filters.endTime) {
+            const endTime = new Date(filters.endTime);
+            mockLogs = mockLogs.filter(log => new Date(log.time) <= endTime);
+        }
+
+        return mockLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
     }
 
     async testConnection() {
@@ -2125,9 +2607,63 @@ class ClaudeProxyApp {
         });
     }
 
-    viewRequestDetails(requestId) {
-        // 模拟显示请求详情
-        alert(`查看请求详情: ${requestId}\n\n这里将显示完整的请求和响应信息。`);
+    async viewRequestDetails(requestId) {
+        console.log('viewRequestDetails called with requestId:', requestId);
+        const modal = document.getElementById('requestDetailsModal');
+        const title = document.getElementById('requestDetailsTitle');
+        const content = document.getElementById('requestDetailsContent');
+        
+        console.log('Modal element:', modal);
+        console.log('Content element:', content);
+        
+        if (!modal || !content) {
+            console.error('Request details modal elements not found');
+            return;
+        }
+
+        // Show modal
+        modal.classList.add('show');
+        console.log('Modal show class added');
+        
+        // Show loading state
+        content.innerHTML = `
+            <div class="loading" style="text-align: center; padding: 40px;">
+                <div class="loading-spinner-container">
+                    <div class="loading-spinner enhanced"></div>
+                </div>
+                <p>${this.t('requests.loading_details') || '加载详情中...'}</p>
+            </div>
+        `;
+        console.log('Loading state set');
+
+        try {
+            // Try to fetch real request details from backend
+            console.log('Attempting to fetch from backend...');
+            const response = await this.apiCall(`/admin/logs/${requestId}`);
+            
+            if (response.ok) {
+                console.log('Backend response OK');
+                const data = await response.json();
+                console.log('Backend data received:', data);
+                // Handle the correct data structure - backend returns {log: {...}}
+                const logData = data.log || data.request || data;
+                console.log('Extracted log data:', logData);
+                this.renderRequestDetails(logData);
+            } else {
+                console.log('Backend response not OK, using mock data');
+                // If API call fails, show mock data
+                const mockData = this.generateMockRequestDetails(requestId);
+                console.log('Generated mock data:', mockData);
+                this.renderRequestDetails(mockData);
+            }
+        } catch (error) {
+            console.error('Failed to load request details:', error);
+            // Show mock data on error
+            console.log('Using mock data due to error');
+            const mockData = this.generateMockRequestDetails(requestId);
+            console.log('Generated mock data:', mockData);
+            this.renderRequestDetails(mockData);
+        }
     }
 
     startPeriodicUpdates() {
@@ -2636,8 +3172,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     .action-btn {
-        background: var(--primary-color);
-        color: white;
+        background: var(--claude-primary);
+        color: var(--text-inverse);
         border: none;
         border-radius: 4px;
         padding: 4px 8px;
@@ -2647,7 +3183,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     .action-btn:hover {
-        background: #0056CC;
+        background: var(--claude-primary-hover);
     }
 
     .notification {

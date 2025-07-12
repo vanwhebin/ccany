@@ -1,0 +1,162 @@
+# GoReleaser configuration for ccany
+version: 2
+
+project_name: ccany
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: ccany
+    main: ./cmd/server/
+    binary: ccany
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+      - -X main.BuiltBy=goreleaser
+    tags:
+      - sqlite_math_functions
+      - sqlite_json
+
+archives:
+  - id: ccany
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - LICENSE*
+      - docs/**/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - '^style:'
+      - '^refactor:'
+  groups:
+    - title: 'New Features'
+      regexp: '^.*feat[(\\w)]*:+.*$'
+      order: 0
+    - title: 'Bug Fixes' 
+      regexp: '^.*fix[(\\w)]*:+.*$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*perf[(\\w)]*:+.*$'
+      order: 2
+    - title: 'Dependencies'
+      regexp: '^.*deps[(\\w)]*:+.*$'
+      order: 3
+    - title: 'Others'
+      order: 999
+
+# Docker images using ko-build for multi-arch
+dockers:
+  - image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=BUILD_TIME={{.Date}}"
+  - image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=BUILD_TIME={{.Date}}"
+
+docker_manifests:
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest-arm64"
+
+sboms:
+  - artifacts: archive
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: "{{ .Env.GITHUB_REPOSITORY | replace .Env.GITHUB_REPOSITORY_OWNER \"/\" \"\" }}"
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## CCany {{ .Tag }} Release 🚀
+    
+    This release brings enhanced Claude Code compatibility and improved functionality.
+    
+    ### Quick Start
+    ```bash
+    # Download and run
+    wget https://github.com/{{ .Env.GITHUB_REPOSITORY }}/releases/download/{{ .Tag }}/ccany_{{ .Tag }}_Linux_x86_64.tar.gz
+    tar -xzf ccany_{{ .Tag }}_Linux_x86_64.tar.gz
+    ./ccany
+    ```
+    
+    ### Docker
+    ```bash
+    docker run -p 8080:8080 ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Tag }}
+    ```
+    
+  footer: |
+    **Full Changelog**: https://github.com/{{ .Env.GITHUB_REPOSITORY }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    ## What's Changed
+    
+  name_template: "Release {{.Tag}}"

@@ -165,7 +165,7 @@ func main() {
 	}
 
 	// Create handlers
-	messagesHandler := handlers.NewEnhancedMessagesHandler(cfg, openaiClient, requestLogger, logger)
+	messagesHandler := handlers.NewEnhancedMessagesHandler(cfg, configManager, openaiClient, requestLogger, logger)
 	healthHandler := handlers.NewHealthHandler(cfg, configManager, logger)
 	configHandler := handlers.NewConfigHandler(configManager, logger)
 	usersHandler := handlers.NewUsersHandler(db, authMiddleware, logger)

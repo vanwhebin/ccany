@@ -195,6 +195,39 @@
             justify-content: center;
             padding: var(--space-6);
         }
+
+        /* Setup page controls (language selector and theme toggle) */
+        .setup-controls {
+            position: fixed;
+            top: var(--space-6);
+            right: var(--space-6);
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            z-index: 1000;
+        }
+
+        .language-selector select {
+            padding: var(--space-2) var(--space-3);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition-all);
+            min-width: 100px;
+        }
+
+        .language-selector select:hover {
+            border-color: var(--claude-primary);
+        }
+
+        .language-selector select:focus {
+            border-color: var(--claude-primary);
+            box-shadow: 0 0 0 2px var(--claude-primary-light);
+        }
     </style>
 </head>
 
@@ -262,16 +295,27 @@
         </div>
     </div>
 
-    <!-- Theme Toggle Button -->
-    <button class="theme-toggle" id="themeToggle" title="切换主题">
-        <svg class="theme-toggle-icon sun" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
-            <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <svg class="theme-toggle-icon moon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    </button>
+    <!-- Language and Theme Controls -->
+    <div class="setup-controls">
+        <!-- Language Selector -->
+        <div class="language-selector">
+            <select id="setupLanguageSelect" title="选择语言 / Select Language">
+                <option value="zh-CN">中文</option>
+                <option value="en-US">English</option>
+            </select>
+        </div>
+        
+        <!-- Theme Toggle Button -->
+        <button class="theme-toggle" id="themeToggle" title="切换主题">
+            <svg class="theme-toggle-icon sun" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="theme-toggle-icon moon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
 
     <script>
         document.getElementById('adminSetupForm').addEventListener('submit', async function (e) {
@@ -465,55 +509,145 @@
         }
 
         // Simple i18n for setup page
+        let currentLanguage = 'zh-CN';
+        
         function initializeI18n() {
             // Detect language
-            const currentLanguage = localStorage.getItem('preferred_language') || 
-                                   navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US';
+            currentLanguage = localStorage.getItem('preferred_language') || 
+                             navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US';
             
-            // Simple translation function
-            function t(key) {
-                const translations = {
-                    'zh-CN': {
-                        'setup.welcome': '欢迎使用 CCany！让我们完成首次设置',
-                        'setup.version': '版本:',
-                        'setup.build_time': '构建时间:',
-                        'setup.create_admin': '创建管理员账户',
-                        'setup.admin_username': '管理员用户名',
-                        'setup.admin_password': '管理员密码',
-                        'setup.confirm_password': '确认密码',
-                        'setup.password_requirements': '密码至少6个字符，建议包含大小写字母、数字和特殊字符',
-                        'setup.create_account': '创建管理员账户',
-                        'setup.creating_account': '正在创建管理员账户...',
-                        'setup.setup_complete': '✅ 设置完成！',
-                        'setup.account_created': '管理员账户已创建成功。您现在可以登录到系统。',
-                        'setup.go_to_login': '前往登录'
-                    },
-                    'en-US': {
-                        'setup.welcome': 'Welcome to CCany! Let\'s complete the initial setup',
-                        'setup.version': 'Version:',
-                        'setup.build_time': 'Build Time:',
-                        'setup.create_admin': 'Create Administrator Account',
-                        'setup.admin_username': 'Administrator Username',
-                        'setup.admin_password': 'Administrator Password',
-                        'setup.confirm_password': 'Confirm Password',
-                        'setup.password_requirements': 'Password must be at least 6 characters, recommend including uppercase letters, lowercase letters, numbers and special characters',
-                        'setup.create_account': 'Create Administrator Account',
-                        'setup.creating_account': 'Creating administrator account...',
-                        'setup.setup_complete': '✅ Setup Complete!',
-                        'setup.account_created': 'Administrator account has been created successfully. You can now log in to the system.',
-                        'setup.go_to_login': 'Go to Login'
-                    }
-                };
-                
-                return translations[currentLanguage]?.[key] || key;
-            }
+            // Set language selector value with proper display handling
+            setupLanguageSelector();
             
             // Apply translations
+            applyTranslations();
+        }
+        
+        function setupLanguageSelector() {
+            const languageSelect = document.getElementById('setupLanguageSelect');
+            if (languageSelect) {
+                // Set current language value with enhanced display handling
+                languageSelect.value = currentLanguage;
+                
+                // Force update display if value didn't set properly (same fix as main app)
+                if (languageSelect.value !== currentLanguage) {
+                    const option = languageSelect.querySelector(`option[value="${currentLanguage}"]`);
+                    if (option) {
+                        option.selected = true;
+                        languageSelect.value = currentLanguage;
+                    } else if (languageSelect.options.length > 0) {
+                        languageSelect.selectedIndex = 0;
+                        currentLanguage = languageSelect.value;
+                    }
+                }
+                
+                // Add change event listener
+                languageSelect.addEventListener('change', function(e) {
+                    const newLanguage = e.target.value;
+                    if (newLanguage !== currentLanguage) {
+                        changeLanguage(newLanguage);
+                    }
+                });
+                
+                // Trigger change event to ensure UI updates
+                languageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+        
+        async function changeLanguage(language) {
+            if (currentLanguage === language) return;
+            
+            console.log('Changing setup page language to:', language);
+            
+            const oldLanguage = currentLanguage;
+            currentLanguage = language;
+            
+            try {
+                // Save to localStorage
+                localStorage.setItem('preferred_language', language);
+                
+                // Send language preference to backend if available
+                try {
+                    await fetch('/i18n/language', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            language: language
+                        })
+                    });
+                } catch (error) {
+                    console.warn('Failed to set language preference on backend:', error);
+                }
+                
+                // Apply new translations
+                applyTranslations();
+                
+                // Update language selector display
+                const languageSelect = document.getElementById('setupLanguageSelect');
+                if (languageSelect) {
+                    languageSelect.value = language;
+                }
+                
+                console.log('Setup page language changed successfully to:', language);
+                
+            } catch (error) {
+                console.error('Setup page language change failed:', error);
+                currentLanguage = oldLanguage;
+            }
+        }
+        
+        function applyTranslations() {
             document.querySelectorAll('[data-i18n]').forEach(element => {
                 const key = element.getAttribute('data-i18n');
                 const translation = t(key);
-                element.textContent = translation;
+                if (element.tagName === 'INPUT' && (element.type === 'text' || element.type === 'search')) {
+                    element.placeholder = translation;
+                } else if (element.tagName === 'TEXTAREA') {
+                    element.placeholder = translation;
+                } else {
+                    element.textContent = translation;
+                }
             });
+        }
+            
+        // Simple translation function
+        function t(key) {
+            const translations = {
+                'zh-CN': {
+                    'setup.welcome': '欢迎使用 CCany！让我们完成首次设置',
+                    'setup.version': '版本:',
+                    'setup.build_time': '构建时间:',
+                    'setup.create_admin': '创建管理员账户',
+                    'setup.admin_username': '管理员用户名',
+                    'setup.admin_password': '管理员密码',
+                    'setup.confirm_password': '确认密码',
+                    'setup.password_requirements': '密码至少6个字符，建议包含大小写字母、数字和特殊字符',
+                    'setup.create_account': '创建管理员账户',
+                    'setup.creating_account': '正在创建管理员账户...',
+                    'setup.setup_complete': '✅ 设置完成！',
+                    'setup.account_created': '管理员账户已创建成功。您现在可以登录到系统。',
+                    'setup.go_to_login': '前往登录'
+                },
+                'en-US': {
+                    'setup.welcome': 'Welcome to CCany! Let\'s complete the initial setup',
+                    'setup.version': 'Version:',
+                    'setup.build_time': 'Build Time:',
+                    'setup.create_admin': 'Create Administrator Account',
+                    'setup.admin_username': 'Administrator Username',
+                    'setup.admin_password': 'Administrator Password',
+                    'setup.confirm_password': 'Confirm Password',
+                    'setup.password_requirements': 'Password must be at least 6 characters, recommend including uppercase letters, lowercase letters, numbers and special characters',
+                    'setup.create_account': 'Create Administrator Account',
+                    'setup.creating_account': 'Creating administrator account...',
+                    'setup.setup_complete': '✅ Setup Complete!',
+                    'setup.account_created': 'Administrator account has been created successfully. You can now log in to the system.',
+                    'setup.go_to_login': 'Go to Login'
+                }
+            };
+            
+            return translations[currentLanguage]?.[key] || key;
         }
     </script>
 </body>

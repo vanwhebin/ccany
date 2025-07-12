@@ -323,6 +323,12 @@ class UIAnimationController {
 
     // Enhanced notification system
     showEnhancedNotification(message, type = 'info', duration = 4000) {
+        // Remove any existing notifications first
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(notif => {
+            notif.remove();
+        });
+
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         
@@ -360,7 +366,7 @@ class UIAnimationController {
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
             </svg>`,
             error: `<svg viewBox="0 0 24 24" width="14" height="14">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
             </svg>`,
             warning: `<svg viewBox="0 0 24 24" width="14" height="14">
                 <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="currentColor"/>
@@ -543,11 +549,19 @@ class ClaudeProxyApp {
             if (response.ok) {
                 const data = await response.json();
                 console.log('Translation data received:', data);
-                this.translations = data.messages;
-                console.log('Translations loaded successfully:', Object.keys(this.translations));
+                this.translations = data.messages || {};
+                console.log('Translations loaded successfully. Keys available:', Object.keys(this.translations));
+                
+                // Verify critical translation keys are loaded
+                const criticalKeys = ['config.model_test_success', 'config.model_test_failed'];
+                criticalKeys.forEach(key => {
+                    const value = this.getTranslation(key);
+                    console.log(`Translation check - ${key}: ${value}`);
+                });
             } else {
                 console.error('Failed to load translation files, status:', response.status);
-                console.error('Response text:', await response.text());
+                const responseText = await response.text();
+                console.error('Response text:', responseText);
                 
                 // If loading fails, try to load default language
                 if (this.currentLanguage !== 'zh-CN') {
@@ -555,7 +569,7 @@ class ClaudeProxyApp {
                     const fallbackResponse = await fetch('/i18n/messages/zh-CN');
                     if (fallbackResponse.ok) {
                         const fallbackData = await fallbackResponse.json();
-                        this.translations = fallbackData.messages;
+                        this.translations = fallbackData.messages || {};
                         console.log('Fallback translations loaded successfully');
                     } else {
                         console.error('Failed to load fallback translations');
@@ -592,8 +606,8 @@ class ClaudeProxyApp {
         return fallbackTranslations;
     }
 
-    // Translate text
-    t(key, params = {}) {
+    // Get translation helper method
+    getTranslation(key) {
         const keys = key.split('.');
         let value = this.translations;
         
@@ -601,18 +615,50 @@ class ClaudeProxyApp {
             if (value && typeof value === 'object' && k in value) {
                 value = value[k];
             } else {
-                return key; // Return original key if translation not found
+                return null; // Return null if translation not found
             }
         }
         
-        if (typeof value === 'string') {
-            // Simple parameter replacement
-            return value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
+        return typeof value === 'string' ? value : null;
+    }
+
+    // Translate text - simplified version that primarily uses backend translations
+    t(key, params = {}) {
+        const translation = this.getTranslation(key);
+        
+        if (translation) {
+            // Simple parameter replacement for frontend-cached translations
+            return translation.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
                 return params[paramKey] || match;
             });
         }
         
-        return key;
+        // Return a fallback based on language if translation not found
+        if (this.currentLanguage === 'zh-CN') {
+            // Chinese fallbacks for common keys
+            const fallbacks = {
+                'config.model_test_success': '模型测试成功',
+                'config.model_test_failed': '模型测试失败',
+                'test.duration': '耗时',
+                'test.input_tokens': '输入Token',
+                'test.output_tokens': '输出Token',
+                'help.copied_success': '已复制到剪贴板',
+                'help.copy_failed': '复制失败'
+            };
+            return fallbacks[key] || key;
+        } else {
+            // English fallbacks
+            const fallbacks = {
+                'config.model_test_success': 'Model test successful',
+                'config.model_test_failed': 'Model test failed',
+                'test.duration': 'Duration',
+                'test.input_tokens': 'Input Tokens',
+                'test.output_tokens': 'Output Tokens',
+                'help.copied_success': 'Copied to clipboard',
+                'help.copy_failed': 'Copy failed'
+            };
+            return fallbacks[key] || key;
+        }
     }
 
     // Apply translations to page
@@ -753,81 +799,58 @@ class ClaudeProxyApp {
     setupLanguageSelector() {
         console.log('Setting up language selectors, current language:', this.currentLanguage);
         
+        // Helper function to setup individual language selector with enhanced dropdown fix
+        const setupSelector = (selector, selectorName) => {
+            if (selector) {
+                console.log(`Found ${selectorName}`);
+                // Enhanced dropdown handling (same as config display fix)
+                const targetValue = this.currentLanguage;
+                selector.value = targetValue;
+                
+                // Force update display if value didn't set properly
+                if (selector.value !== targetValue) {
+                    // Try to find matching option
+                    const option = selector.querySelector(`option[value="${targetValue}"]`);
+                    if (option) {
+                        option.selected = true;
+                        selector.value = targetValue;
+                    } else if (selector.options.length > 0) {
+                        // If no exact match, select first option as fallback
+                        selector.selectedIndex = 0;
+                    }
+                }
+                
+                // Trigger change event to ensure UI updates
+                selector.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // 移除现有的事件监听器（如果存在）
+                if (selector._changeHandler) {
+                    selector.removeEventListener('change', selector._changeHandler);
+                    console.log(`Removed existing ${selectorName} event listener`);
+                }
+                
+                // 创建新的事件处理器
+                selector._changeHandler = (e) => {
+                    console.log(`${selectorName} changed to:`, e.target.value);
+                    console.log('About to call changeLanguage with:', e.target.value);
+                    this.changeLanguage(e.target.value);
+                };
+                
+                // 绑定新的事件监听器
+                selector.addEventListener('change', selector._changeHandler);
+                console.log(`${selectorName} event listener attached, current value:`, selector.value);
+            } else {
+                console.log(`${selectorName} not found`);
+            }
+        };
+        
         // Setup main app language selector
         const languageSelect = document.getElementById('languageSelect');
-        if (languageSelect) {
-            console.log('Found main app language selector');
-            // Ensure the correct option is selected
-            languageSelect.value = this.currentLanguage;
-            // Force update if value didn't set properly
-            if (languageSelect.value !== this.currentLanguage) {
-                const option = languageSelect.querySelector(`option[value="${this.currentLanguage}"]`);
-                if (option) {
-                    option.selected = true;
-                }
-            }
-            
-            // 移除现有的事件监听器（如果存在）
-            if (languageSelect._changeHandler) {
-                languageSelect.removeEventListener('change', languageSelect._changeHandler);
-                console.log('Removed existing main app language selector event listener');
-            }
-            
-            // 创建新的事件处理器
-            languageSelect._changeHandler = (e) => {
-                console.log('Main app language selector changed to:', e.target.value);
-                console.log('About to call changeLanguage with:', e.target.value);
-                this.changeLanguage(e.target.value);
-            };
-            
-            // 绑定新的事件监听器
-            languageSelect.addEventListener('change', languageSelect._changeHandler);
-            console.log('Main app language selector event listener attached, current value:', languageSelect.value);
-        } else {
-            console.log('Main app language selector not found');
-        }
+        setupSelector(languageSelect, 'main app language selector');
         
         // Setup login page language selector
         const loginLanguageSelect = document.getElementById('loginLanguageSelect');
-        if (loginLanguageSelect) {
-            console.log('Found login language selector');
-            // Ensure the correct option is selected
-            loginLanguageSelect.value = this.currentLanguage;
-            // Force update if value didn't set properly
-            if (loginLanguageSelect.value !== this.currentLanguage) {
-                const option = loginLanguageSelect.querySelector(`option[value="${this.currentLanguage}"]`);
-                if (option) {
-                    option.selected = true;
-                }
-            }
-            
-            // 移除现有的事件监听器（如果存在）
-            if (loginLanguageSelect._changeHandler) {
-                loginLanguageSelect.removeEventListener('change', loginLanguageSelect._changeHandler);
-                console.log('Removed existing login language selector event listener');
-            }
-            
-            // 创建新的事件处理器
-            loginLanguageSelect._changeHandler = (e) => {
-                console.log('Login language selector changed to:', e.target.value);
-                console.log('About to call changeLanguage with:', e.target.value);
-                this.changeLanguage(e.target.value);
-            };
-            
-            // 绑定新的事件监听器
-            loginLanguageSelect.addEventListener('change', loginLanguageSelect._changeHandler);
-            console.log('Login language selector event listener attached, current value:', loginLanguageSelect.value);
-            
-            // 添加额外的调试信息
-            console.log('Login language selector element:', loginLanguageSelect);
-            console.log('Login language selector options:', Array.from(loginLanguageSelect.options).map(opt => ({value: opt.value, text: opt.text})));
-            
-            // 测试事件监听器是否正常工作
-            console.log('Testing event listener by simulating change...');
-            loginLanguageSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-            console.log('Login language selector not found');
-        }
+        setupSelector(loginLanguageSelect, 'login language selector');
     }
 
     setupEventListeners() {
@@ -1739,16 +1762,39 @@ class ClaudeProxyApp {
             'ignoreSSL': this.config.ignore_ssl_verification
         };
 
-        Object.entries(elements).forEach(([id, value]) => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (element.type === 'checkbox') {
-                    element.checked = value === 'true' || value === true;
-                } else {
-                    element.value = value || '';
+        // Use a small delay to ensure DOM elements are ready
+        setTimeout(() => {
+            Object.entries(elements).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value === 'true' || value === true;
+                    } else if (element.tagName === 'SELECT') {
+                        // Special handling for select elements to ensure proper display
+                        const targetValue = value || '';
+                        element.value = targetValue;
+                        
+                        // Force update display if value didn't set properly
+                        if (element.value !== targetValue) {
+                            // Try to find matching option
+                            const option = element.querySelector(`option[value="${targetValue}"]`);
+                            if (option) {
+                                option.selected = true;
+                                element.value = targetValue;
+                            } else if (element.options.length > 0) {
+                                // If no exact match, select first option as fallback
+                                element.selectedIndex = 0;
+                            }
+                        }
+                        
+                        // Trigger change event to ensure UI updates
+                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        element.value = value || '';
+                    }
                 }
-            }
-        });
+            });
+        }, 100); // Small delay to ensure proper rendering
         
         // 初始化代理配置显示状态
         this.toggleProxyConfig(this.config.proxy_enabled === 'true' || this.config.proxy_enabled === true);
@@ -2558,16 +2604,41 @@ class ClaudeProxyApp {
             const data = await response.json();
 
             if (response.ok && data.status === 'success') {
+                // Use safer translation with explicit fallback
+                const successMsg = this.t('config.model_test_success');
+                const modelTestSuccess = successMsg !== 'config.model_test_success' ? successMsg : '模型测试成功';
+                
+                const durationMsg = this.t('test.duration');
+                const durationLabel = durationMsg !== 'test.duration' ? durationMsg : '耗时';
+                
+                const inputTokensMsg = this.t('test.input_tokens');
+                const inputTokensLabel = inputTokensMsg !== 'test.input_tokens' ? inputTokensMsg : '输入Token';
+                
+                const outputTokensMsg = this.t('test.output_tokens');
+                const outputTokensLabel = outputTokensMsg !== 'test.output_tokens' ? outputTokensMsg : '输出Token';
+                
+                console.log('Model test success translations:', {
+                    success: modelTestSuccess,
+                    duration: durationLabel,
+                    input: inputTokensLabel,
+                    output: outputTokensLabel
+                });
+                
                 this.uiController.showEnhancedNotification(
-                    `${this.t('config.model_test_success') || '模型测试成功'}: ${model}\n` +
-                    `${this.t('test.duration') || '耗时'}: ${data.duration}\n` +
-                    `${this.t('test.input_tokens') || '输入Token'}: ${data.input_tokens}\n` +
-                    `${this.t('test.output_tokens') || '输出Token'}: ${data.output_tokens}`, 
+                    `${modelTestSuccess}: ${model}\n` +
+                    `${durationLabel}: ${data.duration}\n` +
+                    `${inputTokensLabel}: ${data.input_tokens}\n` +
+                    `${outputTokensLabel}: ${data.output_tokens}`, 
                     'success'
                 );
             } else {
+                const failedMsg = this.t('config.model_test_failed');
+                const modelTestFailed = failedMsg !== 'config.model_test_failed' ? failedMsg : '模型测试失败';
+                
+                console.log('Model test failed translation:', modelTestFailed);
+                
                 this.uiController.showEnhancedNotification(
-                    `${this.t('config.model_test_failed') || '模型测试失败'}: ${data.message || data.error?.message || 'Unknown error'}`, 
+                    `${modelTestFailed}: ${data.message || data.error?.message || 'Unknown error'}`, 
                     'error'
                 );
             }
@@ -2983,9 +3054,9 @@ class ClaudeProxyApp {
 
     // Load help page and setup functionality
     loadHelpPage() {
-        // Update current domain in help content
+        // Update current domain in help content first
         this.updateHelpPageDomains();
-        // Setup copy button functionality
+        // Then setup copy button functionality after domains are updated
         this.setupCopyButtons();
     }
 
@@ -3048,45 +3119,59 @@ echo -e '\\n export ANTHROPIC_BASE_URL=${currentDomain}' >> ~/.zshrc`;
 
     // Setup copy button functionality
     setupCopyButtons() {
+        // Find all copy buttons and setup event listeners
         document.querySelectorAll('.copy-btn').forEach(btn => {
-            // Remove existing event listeners
-            btn.replaceWith(btn.cloneNode(true));
-        });
-
-        // Re-attach event listeners
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const textToCopy = btn.dataset.copy;
-                if (textToCopy) {
+            // Remove any existing event listeners by replacing the button
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            // Add new event listener
+            newBtn.addEventListener('click', async () => {
+                let textToCopy = newBtn.dataset.copy;
+                console.log('Copy button clicked, data-copy attribute:', textToCopy);
+                
+                // If data-copy is empty or missing, try to get text from the nearby code block
+                if (!textToCopy || textToCopy.trim() === '') {
+                    console.warn('No text in data-copy attribute, trying to get from code block');
+                    const codeBlock = newBtn.closest('.code-block');
+                    if (codeBlock) {
+                        const codeElement = codeBlock.querySelector('code, pre');
+                        if (codeElement) {
+                            textToCopy = codeElement.textContent.trim();
+                            console.log('Extracted text from code block:', textToCopy);
+                        }
+                    }
+                }
+                
+                if (textToCopy && textToCopy.trim() !== '') {
                     try {
                         await navigator.clipboard.writeText(textToCopy);
                         
                         // Show success feedback
-                        const originalContent = btn.innerHTML;
-                        btn.innerHTML = `
+                        const originalContent = newBtn.innerHTML;
+                        newBtn.innerHTML = `
                             <svg viewBox="0 0 24 24" width="16" height="16">
                                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
                             </svg>
                         `;
-                        btn.classList.add('copied');
+                        newBtn.classList.add('copied');
+                        newBtn.style.color = '#22C55E';
                         
                         setTimeout(() => {
-                            btn.innerHTML = originalContent;
-                            btn.classList.remove('copied');
+                            newBtn.innerHTML = originalContent;
+                            newBtn.classList.remove('copied');
+                            newBtn.style.color = '';
                         }, 2000);
                         
                         // Show notification
-                        this.uiController.showEnhancedNotification(
-                            this.t('help.copied_success') || '已复制到剪贴板', 
-                            'success'
-                        );
+                        this.showNotification('已复制到剪贴板', 'success');
                     } catch (err) {
                         console.error('Failed to copy text: ', err);
-                        this.uiController.showEnhancedNotification(
-                            this.t('help.copy_failed') || '复制失败，请手动选择复制', 
-                            'error'
-                        );
+                        this.showNotification('复制失败，请手动选择复制', 'error');
                     }
+                } else {
+                    console.warn('No text to copy found in data-copy or code block');
+                    this.showNotification('复制失败，没有可复制的内容', 'error');
                 }
             });
         });

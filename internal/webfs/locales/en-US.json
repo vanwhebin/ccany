@@ -162,7 +162,10 @@
     "socks5_password_placeholder": "Password (optional)",
     "socks5_password_hint": "Password for SOCKS5 proxy (if authentication required)",
     "ignore_ssl": "Ignore SSL Verification",
-    "ignore_ssl_hint": "Skip SSL certificate verification (use only in test environments)"
+    "ignore_ssl_hint": "Skip SSL certificate verification (use only in test environments)",
+    "model_test_success": "Model test successful",
+    "model_test_failed": "Model test failed",
+    "please_enter_model": "Please enter model name"
   },
   "users": {
     "title": "User Management",

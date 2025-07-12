@@ -162,7 +162,10 @@
     "socks5_password_placeholder": "密码（可选）",
     "socks5_password_hint": "SOCKS5代理的密码（如果需要认证）",
     "ignore_ssl": "忽略SSL验证",
-    "ignore_ssl_hint": "跳过SSL证书验证（仅在测试环境使用）"
+    "ignore_ssl_hint": "跳过SSL证书验证（仅在测试环境使用）",
+    "model_test_success": "模型测试成功",
+    "model_test_failed": "模型测试失败",
+    "please_enter_model": "请输入模型名称"
   },
   "users": {
     "title": "用户管理",

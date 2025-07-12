@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"ccany/internal/app"
 	"ccany/internal/claudecode"
 	"ccany/internal/client"
 	"ccany/internal/config"
@@ -22,6 +23,7 @@ import (
 // EnhancedMessagesHandler handles Claude messages API requests with Claude Code compatibility
 type EnhancedMessagesHandler struct {
 	config           *config.Config
+	configManager    *app.ConfigManager
 	openaiClient     *client.OpenAIClient
 	requestLogger    *logging.RequestLogger
 	logger           *logrus.Logger
@@ -31,9 +33,10 @@ type EnhancedMessagesHandler struct {
 }
 
 // NewEnhancedMessagesHandler creates a new enhanced messages handler
-func NewEnhancedMessagesHandler(cfg *config.Config, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger) *EnhancedMessagesHandler {
+func NewEnhancedMessagesHandler(cfg *config.Config, configManager *app.ConfigManager, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger) *EnhancedMessagesHandler {
 	return &EnhancedMessagesHandler{
 		config:           cfg,
+		configManager:    configManager,
 		openaiClient:     openaiClient,
 		requestLogger:    requestLogger,
 		logger:           logger,
@@ -43,11 +46,33 @@ func NewEnhancedMessagesHandler(cfg *config.Config, openaiClient *client.OpenAIC
 	}
 }
 
+// getCurrentOpenAIClient creates a fresh OpenAI client using current configuration
+func (h *EnhancedMessagesHandler) getCurrentOpenAIClient() (*client.OpenAIClient, *config.Config, error) {
+	cfg, err := h.configManager.GetConfig()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get current config: %w", err)
+	}
+
+	if cfg.OpenAIAPIKey == "" {
+		return nil, cfg, fmt.Errorf("OpenAI API key not configured")
+	}
+
+	openaiClient := client.NewOpenAIClient(
+		cfg.OpenAIAPIKey,
+		cfg.OpenAIBaseURL,
+		cfg.RequestTimeout,
+		h.logger,
+	)
+
+	return openaiClient, cfg, nil
+}
+
 // CreateMessage handles POST /v1/messages with Claude Code compatibility
 func (h *EnhancedMessagesHandler) CreateMessage(c *gin.Context) {
-	// Check if OpenAI client is configured
-	if h.openaiClient == nil {
-		h.logger.Error("OpenAI client is not configured")
+	// Get current OpenAI client with fresh configuration
+	openaiClient, cfg, err := h.getCurrentOpenAIClient()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get current OpenAI client")
 		c.JSON(http.StatusServiceUnavailable, converter.CreateClaudeErrorResponse("service_unavailable", "OpenAI API is not configured. Please configure OpenAI API key in settings."))
 		return
 	}
@@ -100,25 +125,25 @@ func (h *EnhancedMessagesHandler) CreateMessage(c *gin.Context) {
 	}
 
 	// Convert Claude request to OpenAI format
-	openaiReq, err := converter.ConvertClaudeToOpenAI(&claudeReq, h.config.BigModel, h.config.SmallModel)
+	openaiReq, err := converter.ConvertClaudeToOpenAI(&claudeReq, cfg.BigModel, cfg.SmallModel)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to convert request")
 		c.JSON(http.StatusBadRequest, converter.CreateClaudeErrorResponse("invalid_request_error", "Failed to convert request"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(h.config.RequestTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(cfg.RequestTimeout)*time.Second)
 	defer cancel()
 
 	if claudeReq.Stream {
-		h.handleClaudeCodeStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq)
+		h.handleClaudeCodeStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq, openaiClient)
 	} else {
-		h.handleNonStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq)
+		h.handleNonStreamingRequest(c, ctx, requestID, &claudeReq, openaiReq, openaiClient)
 	}
 }
 
 // handleClaudeCodeStreamingRequest handles streaming requests with Claude Code compatibility
-func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest, openaiClient *client.OpenAIClient) {
 	startTime := time.Now()
 
 	// Initialize Claude Code compatible streaming
@@ -131,7 +156,7 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 	}
 
 	// Get streaming response from OpenAI
-	streamChan, err := h.openaiClient.CreateChatCompletionStream(ctx, openaiReq)
+	streamChan, err := openaiClient.CreateChatCompletionStream(ctx, openaiReq)
 	if err != nil {
 		duration := time.Since(startTime)
 		h.logger.WithError(err).Error("Failed to create stream")
@@ -264,11 +289,11 @@ func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *
 }
 
 // handleNonStreamingRequest handles non-streaming requests (unchanged from original)
-func (h *EnhancedMessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *EnhancedMessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, openaiReq *models.OpenAIChatCompletionRequest, openaiClient *client.OpenAIClient) {
 	startTime := time.Now()
 
 	// Send request to OpenAI
-	openaiResp, err := h.openaiClient.CreateChatCompletion(ctx, openaiReq)
+	openaiResp, err := openaiClient.CreateChatCompletion(ctx, openaiReq)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -281,7 +306,7 @@ func (h *EnhancedMessagesHandler) handleNonStreamingRequest(c *gin.Context, ctx 
 		// Log failed request
 		h.logNonStreamingRequest(requestID, claudeReq, openaiReq, nil, http.StatusInternalServerError, false, 0, 0, duration, err.Error(), startTime)
 
-		errorType := h.openaiClient.ClassifyError(err)
+		errorType := openaiClient.ClassifyError(err)
 		c.JSON(http.StatusInternalServerError, converter.CreateClaudeErrorResponse(errorType, err.Error()))
 		return
 	}
@@ -424,9 +449,10 @@ func (h *EnhancedMessagesHandler) InitializeClaudeCodeConfig() error {
 
 // CreateChatCompletion handles POST /v1/chat/completions (OpenAI API compatible)
 func (h *EnhancedMessagesHandler) CreateChatCompletion(c *gin.Context) {
-	// Check if OpenAI client is configured
-	if h.openaiClient == nil {
-		h.logger.Error("OpenAI client is not configured")
+	// Get current OpenAI client with fresh configuration
+	openaiClient, cfg, err := h.getCurrentOpenAIClient()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get current OpenAI client")
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": gin.H{
 				"message": "OpenAI API is not configured. Please configure OpenAI API key in settings.",
@@ -460,27 +486,27 @@ func (h *EnhancedMessagesHandler) CreateChatCompletion(c *gin.Context) {
 	// Use model mapping from configuration
 	switch openaiReq.Model {
 	case "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307":
-		openaiReq.Model = h.config.BigModel
+		openaiReq.Model = cfg.BigModel
 	default:
-		openaiReq.Model = h.config.SmallModel
+		openaiReq.Model = cfg.SmallModel
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(h.config.RequestTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(cfg.RequestTimeout)*time.Second)
 	defer cancel()
 
 	if openaiReq.Stream {
-		h.handleOpenAIStreamingRequest(c, ctx, requestID, &openaiReq)
+		h.handleOpenAIStreamingRequest(c, ctx, requestID, &openaiReq, openaiClient)
 	} else {
-		h.handleOpenAINonStreamingRequest(c, ctx, requestID, &openaiReq)
+		h.handleOpenAINonStreamingRequest(c, ctx, requestID, &openaiReq, openaiClient)
 	}
 }
 
 // handleOpenAINonStreamingRequest handles non-streaming OpenAI requests
-func (h *EnhancedMessagesHandler) handleOpenAINonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *EnhancedMessagesHandler) handleOpenAINonStreamingRequest(c *gin.Context, ctx context.Context, requestID string, openaiReq *models.OpenAIChatCompletionRequest, openaiClient *client.OpenAIClient) {
 	startTime := time.Now()
 
 	// Send request to OpenAI
-	openaiResp, err := h.openaiClient.CreateChatCompletion(ctx, openaiReq)
+	openaiResp, err := openaiClient.CreateChatCompletion(ctx, openaiReq)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -514,7 +540,7 @@ func (h *EnhancedMessagesHandler) handleOpenAINonStreamingRequest(c *gin.Context
 }
 
 // handleOpenAIStreamingRequest handles streaming OpenAI requests
-func (h *EnhancedMessagesHandler) handleOpenAIStreamingRequest(c *gin.Context, ctx context.Context, requestID string, openaiReq *models.OpenAIChatCompletionRequest) {
+func (h *EnhancedMessagesHandler) handleOpenAIStreamingRequest(c *gin.Context, ctx context.Context, requestID string, openaiReq *models.OpenAIChatCompletionRequest, openaiClient *client.OpenAIClient) {
 	startTime := time.Now()
 
 	// Set SSE headers
@@ -525,7 +551,7 @@ func (h *EnhancedMessagesHandler) handleOpenAIStreamingRequest(c *gin.Context, c
 	c.Header("Access-Control-Allow-Headers", "*")
 
 	// Get streaming response from OpenAI
-	streamChan, err := h.openaiClient.CreateChatCompletionStream(ctx, openaiReq)
+	streamChan, err := openaiClient.CreateChatCompletionStream(ctx, openaiReq)
 	if err != nil {
 		duration := time.Since(startTime)
 		h.logger.WithError(err).Error("Failed to create OpenAI stream")
@@ -620,9 +646,22 @@ func (h *EnhancedMessagesHandler) EstimateTokenCount(req *models.ClaudeMessagesR
 
 // TestOpenAIModel tests a specific OpenAI model directly
 func (h *EnhancedMessagesHandler) TestOpenAIModel(c *gin.Context) {
-	// Check if OpenAI client is configured
-	if h.openaiClient == nil {
-		h.logger.Error("OpenAI client is not configured")
+	// Get current configuration to create a fresh client
+	cfg, err := h.configManager.GetConfig()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get current config for model test")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"message": "Failed to get current configuration",
+				"type":    "config_error",
+			},
+		})
+		return
+	}
+
+	// Check if OpenAI API key is configured
+	if cfg.OpenAIAPIKey == "" {
+		h.logger.Error("OpenAI API key not configured")
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": gin.H{
 				"message": "OpenAI API is not configured. Please configure OpenAI API key in settings.",
@@ -647,6 +686,14 @@ func (h *EnhancedMessagesHandler) TestOpenAIModel(c *gin.Context) {
 		return
 	}
 
+	// Create a fresh OpenAI client with current configuration
+	openaiClient := client.NewOpenAIClient(
+		cfg.OpenAIAPIKey,
+		cfg.OpenAIBaseURL,
+		cfg.RequestTimeout,
+		h.logger,
+	)
+
 	requestID := uuid.New().String()
 	ctx := context.Background()
 
@@ -667,12 +714,12 @@ func (h *EnhancedMessagesHandler) TestOpenAIModel(c *gin.Context) {
 		"request_id": requestID,
 		"model":      testReq.Model,
 		"test_type":  "model_test",
-	}).Info("Testing OpenAI model directly")
+	}).Info("Testing OpenAI model with fresh client")
 
 	startTime := time.Now()
 
 	// Send request directly to OpenAI
-	openaiResp, err := h.openaiClient.CreateChatCompletion(ctx, openaiReq)
+	openaiResp, err := openaiClient.CreateChatCompletion(ctx, openaiReq)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -683,7 +730,7 @@ func (h *EnhancedMessagesHandler) TestOpenAIModel(c *gin.Context) {
 			"error":      err.Error(),
 		}).Error("OpenAI model test failed")
 
-		errorType := h.openaiClient.ClassifyError(err)
+		errorType := openaiClient.ClassifyError(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
 			"message": err.Error(),

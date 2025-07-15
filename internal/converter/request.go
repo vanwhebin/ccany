@@ -19,11 +19,17 @@ func ConvertClaudeToOpenAI(claudeReq *models.ClaudeMessagesRequest, bigModel, sm
 		return nil, fmt.Errorf("failed to convert messages: %w", err)
 	}
 
+	// Limit max_tokens to avoid backend restrictions
+	maxTokens := claudeReq.MaxTokens
+	if maxTokens > 16384 {
+		maxTokens = 16384
+	}
+
 	// Create OpenAI request
 	openaiReq := &models.OpenAIChatCompletionRequest{
 		Model:       openaiModel,
 		Messages:    openaiMessages,
-		MaxTokens:   &claudeReq.MaxTokens,
+		MaxTokens:   &maxTokens,
 		Temperature: claudeReq.Temperature,
 		TopP:        claudeReq.TopP,
 		Stream:      claudeReq.Stream,

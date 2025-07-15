@@ -2,8 +2,9 @@ package models
 
 // Message represents a simple message format
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []OpenAIToolCall `json:"tool_calls,omitempty"`
 }
 
 // Choice represents a choice in the response

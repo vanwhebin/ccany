@@ -1,7 +1,9 @@
 package converter
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"ccany/internal/models"
 )
@@ -128,13 +130,40 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 func convertMessageToClaudeContent(msg models.Message) ([]models.ClaudeContentBlock, error) {
 	var content []models.ClaudeContentBlock
 
-	// Handle text content
-	if msg.Content != "" {
+	// Parse content for custom tool call format if needed
+	cleanedContent, customToolCalls := parseCustomFormatFromContent(msg.Content)
+
+	// Handle remaining text content after custom parsing
+	if cleanedContent != "" {
 		content = append(content, models.ClaudeContentBlock{
 			Type: "text",
-			Text: msg.Content,
+			Text: cleanedContent,
 		})
 	}
+
+	// Handle standard OpenAI tool calls
+	for _, toolCall := range msg.ToolCalls {
+		// Map OpenAI tool name to Claude tool name
+		claudeToolName := mapOpenAIToolNameToClaudeName(toolCall.Function.Name)
+
+		// Parse arguments from string to interface{}
+		var args interface{}
+		if toolCall.Function.Arguments != "" {
+			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+				return nil, fmt.Errorf("failed to parse tool call arguments: %w", err)
+			}
+		}
+
+		content = append(content, models.ClaudeContentBlock{
+			Type:  "tool_use",
+			ID:    toolCall.ID,
+			Name:  claudeToolName,
+			Input: args,
+		})
+	}
+
+	// Add custom tool calls from content
+	content = append(content, customToolCalls...)
 
 	// If no content, add empty text block
 	if len(content) == 0 {
@@ -164,6 +193,88 @@ func mapFinishReasonToClaudeStopReason(finishReason string) string {
 		return "stop_sequence"
 	default:
 		return "end_turn"
+	}
+}
+
+// parseCustomFormatFromContent parses custom tool call format from content
+func parseCustomFormatFromContent(content string) (string, []models.ClaudeContentBlock) {
+	var toolCalls []models.ClaudeContentBlock
+	cleanContent := content
+
+	// Look for custom format patterns like:
+	// <|tool_calls_begin|><|tool_call_begin|>function<|tool_sep|>FsCreateFile
+	// {"file_path": "/path", "content": "..."}
+	// <|tool_call_end|><|tool_calls_end|>
+
+	// Simple approach: look for tool name patterns and extract JSON
+	if strings.Contains(content, "FsCreateFile") || strings.Contains(content, "function") {
+		// Extract tool name and arguments manually
+		if strings.Contains(content, "FsCreateFile") {
+			// Find the JSON part after FsCreateFile
+			startIdx := strings.Index(content, "FsCreateFile")
+			if startIdx != -1 {
+				remaining := content[startIdx:]
+				jsonStart := strings.Index(remaining, "{")
+				jsonEnd := strings.LastIndex(remaining, "}")
+
+				if jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart {
+					jsonStr := remaining[jsonStart : jsonEnd+1]
+
+					// Try to parse the JSON
+					var args map[string]interface{}
+					if err := json.Unmarshal([]byte(jsonStr), &args); err == nil {
+						toolCalls = append(toolCalls, models.ClaudeContentBlock{
+							Type:  "tool_use",
+							ID:    "call_1",
+							Name:  "Write", // Map FsCreateFile to Write
+							Input: args,
+						})
+
+						// Remove the tool call from content
+						beforeTool := content[:strings.Index(content, "function")]
+						cleanContent = strings.TrimSpace(beforeTool)
+					}
+				}
+			}
+		}
+	}
+
+	return cleanContent, toolCalls
+}
+
+// mapOpenAIToolNameToClaudeName maps OpenAI tool names to Claude Code tool names
+func mapOpenAIToolNameToClaudeName(openaiName string) string {
+	switch openaiName {
+	case "FileWrite", "FsCreateFile":
+		return "Write"
+	case "FileRead", "FsReadFile":
+		return "Read"
+	case "FileEdit", "FsEditFile":
+		return "Edit"
+	case "BashCommand":
+		return "Bash"
+	case "GlobSearch":
+		return "Glob"
+	case "GrepSearch":
+		return "Grep"
+	case "ListDirectory":
+		return "LS"
+	case "MultiFileEdit":
+		return "MultiEdit"
+	case "NotebookRead":
+		return "NotebookRead"
+	case "NotebookEdit":
+		return "NotebookEdit"
+	case "WebFetch":
+		return "WebFetch"
+	case "TodoWrite":
+		return "TodoWrite"
+	case "WebSearch":
+		return "WebSearch"
+	case "Task":
+		return "Task"
+	default:
+		return openaiName
 	}
 }
 

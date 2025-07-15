@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"ccany/internal/toolmapping"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -140,7 +142,7 @@ func (s *StreamingService) ProcessTextChunk(c *gin.Context, streamCtx *Streaming
 	}
 }
 
-// ProcessToolCallDeltas processes tool call deltas from OpenAI streaming - based on claude-code-proxy
+// ProcessToolCallDeltas processes tool call deltas from OpenAI streaming - enhanced for Claude Code compatibility
 func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *StreamingContext, toolCallDeltas []interface{}) {
 	for _, tcDelta := range toolCallDeltas {
 		if tcDeltaMap, ok := tcDelta.(map[string]interface{}); ok {
@@ -173,10 +175,12 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 			// Update function name and start content block if we have both id and name
 			if function, exists := tcDeltaMap["function"]; exists {
 				if functionMap, ok := function.(map[string]interface{}); ok {
-					// Update function name
+					// Update function name and map to Claude tool name
 					if name, exists := functionMap["name"]; exists {
 						if nameStr, ok := name.(string); ok && nameStr != "" {
-							toolCall.Name = nameStr
+							// Map OpenAI tool names to Claude tool names
+							claudeToolName := toolmapping.MapOpenAIToClaudeName(nameStr)
+							toolCall.Name = claudeToolName
 						}
 					}
 
@@ -187,7 +191,7 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 						toolCall.ClaudeIndex = claudeIndex
 						toolCall.Started = true
 
-						// Send content_block_start for tool use
+						// Send content_block_start for tool use with proper Claude format
 						toolStartEvent := map[string]interface{}{
 							"type":  "content_block_start",
 							"index": claudeIndex,
@@ -201,16 +205,31 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 						s.writeSSEEvent(c, "content_block_start", toolStartEvent)
 					}
 
-					// Handle function arguments - match Python logic exactly
+					// Handle function arguments with better JSON validation
 					if arguments, exists := functionMap["arguments"]; exists && toolCall.Started && arguments != nil {
 						if argsStr, ok := arguments.(string); ok && argsStr != "" {
 							toolCall.ArgsBuffer += argsStr
 
-							// Try to parse complete JSON and send delta when we have valid JSON
+							// Enhanced JSON parsing with validation
 							var parsedArgs interface{}
-							if json.Unmarshal([]byte(toolCall.ArgsBuffer), &parsedArgs) == nil {
-								// If parsing succeeds and we haven't sent this JSON yet
+							if err := json.Unmarshal([]byte(toolCall.ArgsBuffer), &parsedArgs); err == nil {
+								// Valid JSON - send complete input
 								if !toolCall.JSONSent {
+									toolDeltaEvent := map[string]interface{}{
+										"type":  "content_block_delta",
+										"index": toolCall.ClaudeIndex,
+										"delta": map[string]interface{}{
+											"type":       "input_json_delta",
+											"input_json": parsedArgs, // Send parsed JSON instead of string
+										},
+									}
+									s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
+									toolCall.JSONSent = true
+								}
+							} else {
+								// Incomplete JSON - send partial if we have some content
+								if len(toolCall.ArgsBuffer) > 2 && !toolCall.JSONSent {
+									// Only send partial for substantial content to avoid spam
 									toolDeltaEvent := map[string]interface{}{
 										"type":  "content_block_delta",
 										"index": toolCall.ClaudeIndex,
@@ -220,10 +239,8 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 										},
 									}
 									s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
-									toolCall.JSONSent = true
 								}
 							}
-							// If JSON is incomplete, continue accumulating
 						}
 					}
 				}
@@ -238,7 +255,7 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 }
 
 // FinalizeStreaming sends final Claude Code compatible events
-func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *StreamingContext, stopReason string) {
+func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *StreamingContext, stopReason string, inputTokens, outputTokens int) {
 	// Send content_block_stop event for text block
 	contentBlockStopEvent := map[string]interface{}{
 		"type":  "content_block_stop",
@@ -257,7 +274,7 @@ func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *Streamin
 		}
 	}
 
-	// Send message_delta event with stop reason
+	// Send message_delta event with stop reason and proper usage
 	messageDeltaEvent := map[string]interface{}{
 		"type": "message_delta",
 		"delta": map[string]interface{}{
@@ -265,8 +282,8 @@ func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *Streamin
 			"stop_sequence": nil,
 		},
 		"usage": map[string]interface{}{
-			"input_tokens":  0,
-			"output_tokens": 0,
+			"input_tokens":  inputTokens,
+			"output_tokens": outputTokens,
 		},
 	}
 	s.writeSSEEvent(c, "message_delta", messageDeltaEvent)
@@ -295,7 +312,7 @@ func (s *StreamingService) HandleStreamingError(c *gin.Context, streamCtx *Strea
 	s.writeSSEEvent(c, "error", errorEvent)
 
 	// Ensure we still send proper termination events
-	s.FinalizeStreaming(c, streamCtx, "error")
+	s.FinalizeStreaming(c, streamCtx, "error", 0, 0)
 }
 
 // UpdateUsageTokens updates token usage in the streaming context

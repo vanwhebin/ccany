@@ -3,9 +3,12 @@ package converter
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"ccany/internal/models"
+	"ccany/internal/toolmapping"
 )
 
 // ConvertOpenAIToClaudeResponse converts OpenAI response to Claude format
@@ -22,16 +25,29 @@ func ConvertOpenAIToClaudeResponse(openaiResp *models.OpenAIChatCompletionRespon
 		return nil, fmt.Errorf("failed to convert message content: %w", err)
 	}
 
-	// Map finish reason
+	// Map finish reason - improved mapping based on tool use
 	stopReason := mapFinishReasonToClaudeStopReason(choice.FinishReason)
 
+	// If content contains tool_use, override stop_reason regardless of finish_reason
+	hasTools := hasToolUseContent(content)
+	if hasTools {
+		stopReason = "tool_use"
+	}
+
+	// Generate proper message ID if not provided
+	messageID := openaiResp.ID
+	if messageID == "" {
+		messageID = fmt.Sprintf("msg_%d", time.Now().Unix())
+	}
+
 	claudeResp := &models.ClaudeResponse{
-		ID:         openaiResp.ID,
-		Type:       "message",
-		Role:       "assistant",
-		Content:    content,
-		Model:      originalReq.Model, // Use original Claude model name
-		StopReason: stopReason,
+		ID:           messageID,
+		Type:         "message",
+		Role:         "assistant",
+		Content:      content,
+		Model:        originalReq.Model, // Use original Claude model name
+		StopReason:   stopReason,
+		StopSequence: nil, // Always nil for Claude responses
 		Usage: models.ClaudeUsage{
 			InputTokens:  openaiResp.Usage.PromptTokens,
 			OutputTokens: openaiResp.Usage.CompletionTokens,
@@ -130,21 +146,10 @@ func ConvertOpenAIStreamToClaudeStream(openaiChunk *models.OpenAIStreamResponse,
 func convertMessageToClaudeContent(msg models.Message) ([]models.ClaudeContentBlock, error) {
 	var content []models.ClaudeContentBlock
 
-	// Parse content for custom tool call format if needed
-	cleanedContent, customToolCalls := parseCustomFormatFromContent(msg.Content)
-
-	// Handle remaining text content after custom parsing
-	if cleanedContent != "" {
-		content = append(content, models.ClaudeContentBlock{
-			Type: "text",
-			Text: cleanedContent,
-		})
-	}
-
-	// Handle standard OpenAI tool calls
+	// 1. First handle standard OpenAI tool calls (highest priority)
 	for _, toolCall := range msg.ToolCalls {
 		// Map OpenAI tool name to Claude tool name
-		claudeToolName := mapOpenAIToolNameToClaudeName(toolCall.Function.Name)
+		claudeToolName := toolmapping.MapOpenAIToClaudeName(toolCall.Function.Name)
 
 		// Parse arguments from string to interface{}
 		var args interface{}
@@ -162,8 +167,21 @@ func convertMessageToClaudeContent(msg models.Message) ([]models.ClaudeContentBl
 		})
 	}
 
-	// Add custom tool calls from content
-	content = append(content, customToolCalls...)
+	// 2. If no standard tool calls, try to parse custom formats from content
+	cleanedContent := msg.Content
+	if len(msg.ToolCalls) == 0 {
+		var customToolCalls []models.ClaudeContentBlock
+		cleanedContent, customToolCalls = parseCustomFormatFromContent(msg.Content)
+		content = append(content, customToolCalls...)
+	}
+
+	// 3. Handle remaining text content
+	if cleanedContent != "" {
+		content = append(content, models.ClaudeContentBlock{
+			Type: "text",
+			Text: cleanedContent,
+		})
+	}
 
 	// If no content, add empty text block
 	if len(content) == 0 {
@@ -191,91 +209,608 @@ func mapFinishReasonToClaudeStopReason(finishReason string) string {
 		return "tool_use"
 	case "content_filter":
 		return "stop_sequence"
+	case "function_call": // Legacy OpenAI function calling
+		return "tool_use"
 	default:
 		return "end_turn"
 	}
 }
 
-// parseCustomFormatFromContent parses custom tool call format from content
+// ToolCallParser represents a robust tool call parser
+type ToolCallParser struct {
+	patterns []ToolCallPattern
+}
+
+// ToolCallPattern defines a pattern for parsing tool calls
+type ToolCallPattern struct {
+	StartMarker string
+	EndMarker   string
+	ToolSep     string
+	Name        string
+}
+
+// NewToolCallParser creates a new parser with predefined patterns
+func NewToolCallParser() *ToolCallParser {
+	return &ToolCallParser{
+		patterns: []ToolCallPattern{
+			// Unicode pattern (current backend)
+			{
+				StartMarker: "<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>",
+				EndMarker:   "<｜tool▁call▁end｜><｜tool▁calls▁end｜>",
+				ToolSep:     "<｜tool▁sep｜>",
+				Name:        "unicode",
+			},
+			// Standard pattern (fallback)
+			{
+				StartMarker: "<|tool_calls_begin|><|tool_call_begin|>function<|tool_sep|>",
+				EndMarker:   "<|tool_call_end|><|tool_calls_end|>",
+				ToolSep:     "<|tool_sep|>",
+				Name:        "standard",
+			},
+			// Alternative patterns for different backends
+			{
+				StartMarker: "```tool_call",
+				EndMarker:   "```",
+				ToolSep:     "\n",
+				Name:        "markdown",
+			},
+		},
+	}
+}
+
+// parseCustomFormatFromContent parses custom tool call format from content using robust parsing
 func parseCustomFormatFromContent(content string) (string, []models.ClaudeContentBlock) {
-	var toolCalls []models.ClaudeContentBlock
-	cleanContent := content
+	parser := NewToolCallParser()
 
-	// Look for custom format patterns like:
-	// <|tool_calls_begin|><|tool_call_begin|>function<|tool_sep|>FsCreateFile
-	// {"file_path": "/path", "content": "..."}
-	// <|tool_call_end|><|tool_calls_end|>
+	// First try the robust parser for Unicode formats
+	cleanContent, toolCalls := parser.ParseContent(content)
 
-	// Simple approach: look for tool name patterns and extract JSON
-	if strings.Contains(content, "FsCreateFile") || strings.Contains(content, "function") {
-		// Extract tool name and arguments manually
-		if strings.Contains(content, "FsCreateFile") {
-			// Find the JSON part after FsCreateFile
-			startIdx := strings.Index(content, "FsCreateFile")
-			if startIdx != -1 {
-				remaining := content[startIdx:]
-				jsonStart := strings.Index(remaining, "{")
-				jsonEnd := strings.LastIndex(remaining, "}")
-
-				if jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart {
-					jsonStr := remaining[jsonStart : jsonEnd+1]
-
-					// Try to parse the JSON
-					var args map[string]interface{}
-					if err := json.Unmarshal([]byte(jsonStr), &args); err == nil {
-						toolCalls = append(toolCalls, models.ClaudeContentBlock{
-							Type:  "tool_use",
-							ID:    "call_1",
-							Name:  "Write", // Map FsCreateFile to Write
-							Input: args,
-						})
-
-						// Remove the tool call from content
-						beforeTool := content[:strings.Index(content, "function")]
-						cleanContent = strings.TrimSpace(beforeTool)
-					}
-				}
-			}
+	// If no tool calls found, try to parse embedded JSON tool calls
+	if len(toolCalls) == 0 {
+		jsonToolCalls, jsonCleanContent := parseEmbeddedJSONToolCalls(content)
+		if len(jsonToolCalls) > 0 {
+			return jsonCleanContent, jsonToolCalls
 		}
 	}
 
 	return cleanContent, toolCalls
 }
 
-// mapOpenAIToolNameToClaudeName maps OpenAI tool names to Claude Code tool names
-func mapOpenAIToolNameToClaudeName(openaiName string) string {
-	switch openaiName {
-	case "FileWrite", "FsCreateFile":
-		return "Write"
-	case "FileRead", "FsReadFile":
-		return "Read"
-	case "FileEdit", "FsEditFile":
-		return "Edit"
-	case "BashCommand":
-		return "Bash"
-	case "GlobSearch":
-		return "Glob"
-	case "GrepSearch":
-		return "Grep"
-	case "ListDirectory":
-		return "LS"
-	case "MultiFileEdit":
-		return "MultiEdit"
-	case "NotebookRead":
-		return "NotebookRead"
-	case "NotebookEdit":
-		return "NotebookEdit"
-	case "WebFetch":
-		return "WebFetch"
-	case "TodoWrite":
-		return "TodoWrite"
-	case "WebSearch":
-		return "WebSearch"
-	case "Task":
-		return "Task"
-	default:
-		return openaiName
+// parseEmbeddedJSONToolCalls parses tool calls embedded as JSON in text content
+func parseEmbeddedJSONToolCalls(content string) ([]models.ClaudeContentBlock, string) {
+	var toolCalls []models.ClaudeContentBlock
+
+	// Look for JSON object with tool_calls - try multiple patterns
+	jsonStart := -1
+	patterns := []string{
+		`{"tool_calls":`,  // Direct JSON
+		`"tool_calls": [`, // Spaced JSON
+		`tool_calls": [`,  // Within larger JSON
 	}
+
+	for _, pattern := range patterns {
+		if idx := strings.Index(content, pattern); idx != -1 {
+			// Find the start of the JSON object by looking backwards for '{'
+			jsonStart = idx
+			for jsonStart > 0 && content[jsonStart] != '{' {
+				jsonStart--
+			}
+			break
+		}
+	}
+
+	if jsonStart == -1 {
+		return toolCalls, content
+	}
+
+	// Find the matching closing brace using bracket counting
+	jsonEnd := findMatchingBrace(content, jsonStart)
+	if jsonEnd == -1 {
+		return toolCalls, content
+	}
+
+	jsonStr := content[jsonStart : jsonEnd+1]
+
+	// Fix malformed JSON where arguments is not properly escaped
+	// Replace unescaped nested JSON in arguments field
+	jsonStr = fixArgumentsJSON(jsonStr)
+
+	// Parse the JSON structure
+	var toolCallContainer struct {
+		ToolCalls []struct {
+			ID       string `json:"id"`
+			Type     string `json:"type"`
+			Function struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			} `json:"function"`
+		} `json:"tool_calls"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &toolCallContainer); err == nil {
+		for _, tc := range toolCallContainer.ToolCalls {
+			// Parse function arguments
+			var args map[string]interface{}
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err == nil {
+				// Map tool name to Claude tool name
+				claudeToolName := mapToolName(tc.Function.Name)
+
+				toolCalls = append(toolCalls, models.ClaudeContentBlock{
+					Type:  "tool_use",
+					ID:    tc.ID,
+					Name:  claudeToolName,
+					Input: args,
+				})
+			}
+		}
+	}
+
+	// Remove JSON tool calls from content
+	beforeJSON := content[:jsonStart]
+	afterJSON := ""
+	if jsonEnd+1 < len(content) {
+		afterJSON = content[jsonEnd+1:]
+	}
+	cleanContent := strings.TrimSpace(beforeJSON + afterJSON)
+
+	return toolCalls, cleanContent
+}
+
+// findMatchingBrace finds the matching closing brace for JSON
+func findMatchingBrace(content string, start int) int {
+	braceCount := 0
+	inString := false
+	escapeNext := false
+
+	for i := start; i < len(content); i++ {
+		char := content[i]
+
+		if escapeNext {
+			escapeNext = false
+			continue
+		}
+
+		if char == '\\' {
+			escapeNext = true
+			continue
+		}
+
+		if char == '"' {
+			inString = !inString
+			continue
+		}
+
+		if !inString {
+			if char == '{' {
+				braceCount++
+			} else if char == '}' {
+				braceCount--
+				if braceCount == 0 {
+					return i
+				}
+			}
+		}
+	}
+
+	return -1
+}
+
+// mapToolName maps various tool name formats to Claude tool names using the centralized mapper
+func mapToolName(toolName string) string {
+	// Try custom mapping first
+	claudeToolName := toolmapping.MapCustomToClaudeName(toolName)
+	if claudeToolName != toolName {
+		return claudeToolName
+	}
+
+	// Try OpenAI mapping
+	claudeToolName = toolmapping.MapOpenAIToClaudeName(toolName)
+	if claudeToolName != toolName {
+		return claudeToolName
+	}
+
+	// Add dynamic mappings for common patterns if not already in the mapper
+	switch strings.ToLower(toolName) {
+	case "create_file", "createfile", "file_create":
+		toolmapping.AddCustomMapping(toolName, "Write")
+		return "Write"
+	case "read_file", "readfile", "file_read":
+		toolmapping.AddCustomMapping(toolName, "Read")
+		return "Read"
+	case "edit_file", "editfile", "file_edit":
+		toolmapping.AddCustomMapping(toolName, "Edit")
+		return "Edit"
+	case "run_command", "runcommand", "command", "exec":
+		toolmapping.AddCustomMapping(toolName, "Bash")
+		return "Bash"
+	default:
+		return toolName
+	}
+}
+
+// ParseContent parses content and extracts tool calls using multiple patterns
+func (p *ToolCallParser) ParseContent(content string) (string, []models.ClaudeContentBlock) {
+	var allToolCalls []models.ClaudeContentBlock
+	cleanContent := content
+
+	// Try each pattern
+	for _, pattern := range p.patterns {
+		toolCalls, updatedContent := p.parseWithPattern(cleanContent, pattern)
+		allToolCalls = append(allToolCalls, toolCalls...)
+		cleanContent = updatedContent
+
+		// If we found tool calls, we might want to continue looking for more
+		// with different patterns in the remaining content
+	}
+
+	return cleanContent, allToolCalls
+}
+
+// parseWithPattern parses content using a specific pattern
+func (p *ToolCallParser) parseWithPattern(content string, pattern ToolCallPattern) ([]models.ClaudeContentBlock, string) {
+	var toolCalls []models.ClaudeContentBlock
+	cleanContent := content
+	callCounter := 1
+
+	// Look for multiple tool calls in the same content
+	searchContent := content
+	offset := 0
+
+	for {
+		startPos := strings.Index(searchContent, pattern.StartMarker)
+		if startPos == -1 {
+			break
+		}
+
+		actualStartPos := offset + startPos
+
+		// Extract tool call
+		toolCall, endPos := p.extractSingleToolCall(content[actualStartPos:], pattern, callCounter)
+		if toolCall != nil {
+			toolCalls = append(toolCalls, *toolCall)
+			callCounter++
+
+			// Remove this tool call from content
+			if endPos > 0 {
+				actualEndPos := actualStartPos + endPos
+				beforeTool := content[:actualStartPos]
+				afterTool := ""
+				if actualEndPos < len(content) {
+					afterTool = content[actualEndPos:]
+				}
+				cleanContent = strings.TrimSpace(beforeTool + afterTool)
+				content = cleanContent // Update for next iteration
+
+				// Reset search
+				searchContent = cleanContent
+				offset = 0
+			} else {
+				// If we couldn't find the end, move past this start marker
+				searchContent = searchContent[startPos+len(pattern.StartMarker):]
+				offset = actualStartPos + len(pattern.StartMarker)
+			}
+		} else {
+			// If extraction failed, move past this start marker
+			searchContent = searchContent[startPos+len(pattern.StartMarker):]
+			offset = actualStartPos + len(pattern.StartMarker)
+		}
+	}
+
+	return toolCalls, cleanContent
+}
+
+// extractSingleToolCall extracts a single tool call from content
+func (p *ToolCallParser) extractSingleToolCall(content string, pattern ToolCallPattern, callID int) (*models.ClaudeContentBlock, int) {
+	if !strings.HasPrefix(content, pattern.StartMarker) {
+		return nil, 0
+	}
+
+	// Extract everything after the start marker
+	afterStart := content[len(pattern.StartMarker):]
+
+	// Find the end marker
+	endPos := strings.Index(afterStart, pattern.EndMarker)
+	var toolCallContent string
+	var totalLength int
+
+	if endPos != -1 {
+		toolCallContent = afterStart[:endPos]
+		totalLength = len(pattern.StartMarker) + endPos + len(pattern.EndMarker)
+	} else {
+		// No end marker found, take everything
+		toolCallContent = afterStart
+		totalLength = len(content)
+	}
+
+	// Parse tool name and arguments
+	toolName, args := p.parseToolCallContent(toolCallContent, pattern)
+	if toolName == "" {
+		return nil, 0
+	}
+
+	// Map tool name to Claude tool name
+	claudeToolName := toolmapping.MapCustomToClaudeName(toolName)
+
+	toolCall := &models.ClaudeContentBlock{
+		Type:  "tool_use",
+		ID:    fmt.Sprintf("call_%d", callID),
+		Name:  claudeToolName,
+		Input: args,
+	}
+
+	return toolCall, totalLength
+}
+
+// parseToolCallContent parses the content inside a tool call
+func (p *ToolCallParser) parseToolCallContent(content string, pattern ToolCallPattern) (string, map[string]interface{}) {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return "", nil
+	}
+
+	// First line should contain the tool name
+	toolName := strings.TrimSpace(lines[0])
+
+	// Rest should be JSON
+	var jsonLines []string
+	if len(lines) > 1 {
+		jsonLines = lines[1:]
+	}
+
+	// Join and clean JSON content
+	jsonContent := strings.Join(jsonLines, "\n")
+	jsonContent = strings.ReplaceAll(jsonContent, "```", "")
+	jsonContent = strings.TrimSpace(jsonContent)
+
+	// Try multiple JSON extraction strategies
+	args := p.extractJSON(jsonContent)
+
+	return toolName, args
+}
+
+// extractJSON attempts to extract JSON using multiple strategies
+func (p *ToolCallParser) extractJSON(content string) map[string]interface{} {
+	if content == "" {
+		return make(map[string]interface{})
+	}
+
+	// Strategy 1: Direct JSON parsing
+	var args map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &args); err == nil {
+		return args
+	}
+
+	// Strategy 2: Find JSON boundaries
+	jsonStart := strings.Index(content, "{")
+	jsonEnd := strings.LastIndex(content, "}")
+
+	if jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart {
+		jsonStr := content[jsonStart : jsonEnd+1]
+
+		// Clean up common issues
+		jsonStr = strings.ReplaceAll(jsonStr, "\n", " ")
+		jsonStr = strings.ReplaceAll(jsonStr, "\t", " ")
+
+		// Normalize multiple spaces
+		for strings.Contains(jsonStr, "  ") {
+			jsonStr = strings.ReplaceAll(jsonStr, "  ", " ")
+		}
+
+		if err := json.Unmarshal([]byte(jsonStr), &args); err == nil {
+			return args
+		}
+	}
+
+	// Strategy 3: Manual key-value extraction for malformed JSON
+	return p.extractKeyValuePairs(content)
+}
+
+// extractKeyValuePairs manually extracts key-value pairs from malformed JSON
+func (p *ToolCallParser) extractKeyValuePairs(content string) map[string]interface{} {
+	args := make(map[string]interface{})
+
+	// Remove braces
+	content = strings.Trim(content, "{}")
+	content = strings.TrimSpace(content)
+
+	if content == "" {
+		return args
+	}
+
+	// Try to split by commas, but be careful about commas inside strings
+	pairs := p.smartSplit(content, ',')
+
+	for _, pair := range pairs {
+		if key, value := p.parseKeyValue(strings.TrimSpace(pair)); key != "" {
+			args[key] = value
+		}
+	}
+
+	return args
+}
+
+// smartSplit splits by delimiter but respects quoted strings
+func (p *ToolCallParser) smartSplit(content string, delimiter rune) []string {
+	var parts []string
+	var current strings.Builder
+	inQuotes := false
+	escapeNext := false
+
+	for _, r := range content {
+		if escapeNext {
+			current.WriteRune(r)
+			escapeNext = false
+			continue
+		}
+
+		if r == '\\' {
+			escapeNext = true
+			current.WriteRune(r)
+			continue
+		}
+
+		if r == '"' {
+			inQuotes = !inQuotes
+			current.WriteRune(r)
+			continue
+		}
+
+		if r == delimiter && !inQuotes {
+			parts = append(parts, current.String())
+			current.Reset()
+			continue
+		}
+
+		current.WriteRune(r)
+	}
+
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	return parts
+}
+
+// parseKeyValue parses a key-value pair
+func (p *ToolCallParser) parseKeyValue(pair string) (string, interface{}) {
+	colonPos := strings.Index(pair, ":")
+	if colonPos == -1 {
+		return "", nil
+	}
+
+	key := strings.TrimSpace(pair[:colonPos])
+	value := strings.TrimSpace(pair[colonPos+1:])
+
+	// Remove quotes from key
+	key = strings.Trim(key, "\"'")
+
+	// Parse value
+	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
+		// String value
+		value = strings.Trim(value, "\"")
+		// Unescape common escape sequences
+		value = strings.ReplaceAll(value, "\\n", "\n")
+		value = strings.ReplaceAll(value, "\\t", "\t")
+		value = strings.ReplaceAll(value, "\\\"", "\"")
+		return key, value
+	}
+
+	// Try to parse as number or boolean
+	if value == "true" {
+		return key, true
+	}
+	if value == "false" {
+		return key, false
+	}
+	if value == "null" {
+		return key, nil
+	}
+
+	// Try as number
+	if num, err := strconv.ParseFloat(value, 64); err == nil {
+		if float64(int(num)) == num {
+			return key, int(num)
+		}
+		return key, num
+	}
+
+	// Default to string
+	return key, value
+}
+
+// fixArgumentsJSON fixes malformed JSON where arguments contains unescaped nested JSON
+func fixArgumentsJSON(jsonStr string) string {
+	// The issue is that arguments field contains a string that looks like JSON but isn't properly escaped
+	// Pattern: "arguments": "{\"key\": \"value\"}"
+	// Should be: "arguments": "{\\\"key\\\": \\\"value\\\"}"
+
+	pattern := `"arguments": "`
+	start := strings.Index(jsonStr, pattern)
+	if start == -1 {
+		return jsonStr // No arguments field found
+	}
+
+	contentStart := start + len(pattern)
+
+	// Find the end of the arguments string value by counting braces and handling escapes
+	braceCount := 0
+	i := contentStart
+	var contentEnd int = -1
+	escaped := false
+
+	for i < len(jsonStr) {
+		char := jsonStr[i]
+
+		if escaped {
+			escaped = false
+			i++
+			continue
+		}
+
+		if char == '\\' {
+			escaped = true
+			i++
+			continue
+		}
+
+		if char == '{' {
+			braceCount++
+		} else if char == '}' {
+			braceCount--
+			if braceCount == 0 {
+				// Found the end of the JSON object, now look for the closing quote
+				for j := i + 1; j < len(jsonStr); j++ {
+					if jsonStr[j] == '"' {
+						contentEnd = j
+						break
+					}
+				}
+				break
+			}
+		}
+		i++
+	}
+
+	if contentEnd == -1 {
+		return jsonStr
+	}
+
+	// Extract the content and properly escape it
+	unescapedContent := jsonStr[contentStart:contentEnd]
+
+	// Escape quotes in the JSON content, but be careful not to double-escape
+	// Step 1: Temporarily replace already escaped quotes
+	step1Replacer := strings.NewReplacer(`\"`, "__ESCAPED_QUOTE__")
+	tempContent := step1Replacer.Replace(unescapedContent)
+
+	// Step 2: Escape unescaped quotes and restore escaped ones
+	step2Replacer := strings.NewReplacer(
+		`"`, `\"`, // Escape unescaped quotes
+		"__ESCAPED_QUOTE__", `\"`, // Restore originally escaped quotes
+	)
+	escapedContent := step2Replacer.Replace(tempContent)
+
+	// Rebuild the string
+	result := jsonStr[:contentStart] + escapedContent + jsonStr[contentEnd:]
+
+	return result
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// hasToolUseContent checks if content contains tool_use blocks
+func hasToolUseContent(content []models.ClaudeContentBlock) bool {
+	for _, block := range content {
+		if block.Type == "tool_use" {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateClaudeErrorResponse creates a Claude-formatted error response

@@ -243,7 +243,7 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 	}
 
 	// Finalize streaming with proper Claude Code events
-	h.streamingService.FinalizeStreaming(c, streamCtx, stopReason)
+	h.streamingService.FinalizeStreaming(c, streamCtx, stopReason, totalInputTokens, totalOutputTokens)
 
 	duration := time.Since(startTime)
 

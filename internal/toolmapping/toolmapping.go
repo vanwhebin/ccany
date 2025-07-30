@@ -3,6 +3,7 @@ package toolmapping
 import "sync"
 
 // customMappings stores dynamic custom tool name mappings
+// It is protected by mapMutex to ensure concurrent-safe access.
 var (
 	customMappings = make(map[string]string)
 	mapMutex       sync.RWMutex

@@ -5,9 +5,145 @@ import (
 	"sync"
 
 	"ccany/internal/models"
+	"ccany/internal/tokenizer"
 
 	"github.com/sirupsen/logrus"
 )
+
+// ModelRoutingStrategy defines the interface for model routing strategies
+type ModelRoutingStrategy interface {
+	ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool
+	GetModel() string
+	GetReason() string
+}
+
+// CommaSeperatedStrategy handles comma-separated model lists
+type CommaSeperatedStrategy struct {
+	originalModel string
+}
+
+func (s *CommaSeperatedStrategy) ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool {
+	return strings.Contains(req.Model, ",")
+}
+
+func (s *CommaSeperatedStrategy) GetModel() string {
+	return s.originalModel
+}
+
+func (s *CommaSeperatedStrategy) GetReason() string {
+	return "comma_separated_models"
+}
+
+// LongContextStrategy handles requests with high token count
+type LongContextStrategy struct {
+	model     string
+	threshold int
+}
+
+func (s *LongContextStrategy) ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool {
+	return tokenCount > s.threshold && s.model != ""
+}
+
+func (s *LongContextStrategy) GetModel() string {
+	return s.model
+}
+
+func (s *LongContextStrategy) GetReason() string {
+	return "long_context"
+}
+
+// BackgroundModelStrategy handles haiku model requests
+type BackgroundModelStrategy struct {
+	model string
+}
+
+func (s *BackgroundModelStrategy) ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool {
+	return strings.HasPrefix(req.Model, "claude-3-5-haiku") && s.model != ""
+}
+
+func (s *BackgroundModelStrategy) GetModel() string {
+	return s.model
+}
+
+func (s *BackgroundModelStrategy) GetReason() string {
+	return "background_model"
+}
+
+// ThinkingModeStrategy handles thinking mode requests
+type ThinkingModeStrategy struct {
+	model string
+}
+
+func (s *ThinkingModeStrategy) ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool {
+	return req.Thinking && s.model != ""
+}
+
+func (s *ThinkingModeStrategy) GetModel() string {
+	return s.model
+}
+
+func (s *ThinkingModeStrategy) GetReason() string {
+	return "thinking_mode"
+}
+
+// WebSearchStrategy handles requests with web search tools
+type WebSearchStrategy struct {
+	model   string
+	enabled bool
+}
+
+func (s *WebSearchStrategy) ShouldApply(req *models.ClaudeMessagesRequest, tokenCount int) bool {
+	if !s.enabled || s.model == "" {
+		return false
+	}
+
+	// Check if any tool is web_search type
+	for _, tool := range req.Tools {
+		if tool.Name == "web_search" {
+			return true
+		}
+		// Check in input schema for type field
+		if typeVal, exists := tool.InputSchema["type"]; exists {
+			if typeStr, ok := typeVal.(string); ok && typeStr == "web_search" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (s *WebSearchStrategy) ShouldApplyToRequest(req *RouteRequest) bool {
+	if !s.enabled || s.model == "" {
+		return false
+	}
+
+	// Check if any tool has web_search type or name
+	for _, tool := range req.Tools {
+		if toolMap, ok := tool.(map[string]interface{}); ok {
+			// Check name
+			if name, exists := toolMap["name"]; exists {
+				if nameStr, ok := name.(string); ok && nameStr == "web_search" {
+					return true
+				}
+			}
+			// Check type field if exists
+			if toolType, exists := toolMap["type"]; exists {
+				if typeStr, ok := toolType.(string); ok && typeStr == "web_search" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (s *WebSearchStrategy) GetModel() string {
+	return s.model
+}
+
+func (s *WebSearchStrategy) GetReason() string {
+	return "web_search_tool"
+}
 
 // ModelRouter handles intelligent model routing based on request characteristics
 type ModelRouter struct {
@@ -17,30 +153,94 @@ type ModelRouter struct {
 	smallModel       string
 	reasoningModel   string
 	longContextModel string
+	strategies       []ModelRoutingStrategy  // Ordered list of strategies
+	tokenCounter     *tokenizer.TokenCounter // Token counter for accurate counting
+	routerLogger     *RouterLogger           // Enhanced router logger
 }
 
 // NewModelRouter creates a new model router
 func NewModelRouter(logger *logrus.Logger, bigModel, smallModel string) *ModelRouter {
-	return &ModelRouter{
+	// Create enhanced logger
+	routerLogger, err := NewLoggerFromEnv()
+	if err != nil {
+		logger.WithError(err).Warn("Failed to create router logger, using default")
+	}
+
+	router := &ModelRouter{
 		logger:           logger,
 		bigModel:         bigModel,
 		smallModel:       smallModel,
 		reasoningModel:   "claude-3-5-sonnet-20241022", // Default reasoning model
 		longContextModel: "claude-3-5-sonnet-20241022", // Default long context model
+		tokenCounter:     tokenizer.NewTokenCounter(logger),
+		routerLogger:     routerLogger,
+	}
+
+	// Initialize strategies in priority order
+	router.initializeStrategies()
+	return router
+}
+
+// initializeStrategies sets up the routing strategies in priority order
+func (r *ModelRouter) initializeStrategies() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Use default configuration
+	config := DefaultRouterConfig()
+
+	r.strategies = []ModelRoutingStrategy{
+		// Priority 1: Comma-separated models (direct passthrough)
+		&CommaSeperatedStrategy{},
+
+		// Priority 2: Tool use detection (highest priority for functional requirements)
+		NewToolUseStrategy(r.bigModel, config.EnableToolUseDetection, r.logger),
+
+		// Priority 3: Long context handling
+		&LongContextStrategy{
+			model:     config.LongContext,
+			threshold: config.LongContextThreshold,
+		},
+
+		// Priority 4: Web search detection
+		&WebSearchStrategy{
+			model:   config.WebSearch,
+			enabled: config.EnableWebSearchDetection,
+		},
+
+		// Priority 5: Background model for haiku
+		&BackgroundModelStrategy{
+			model: r.smallModel, // Use smallModel for background tasks
+		},
+
+		// Priority 6: Thinking mode
+		&ThinkingModeStrategy{
+			model: config.Think,
+		},
+	}
+
+	// Set default models if not already set
+	if r.reasoningModel == "" {
+		r.reasoningModel = config.Think
+	}
+	if r.longContextModel == "" {
+		r.longContextModel = config.LongContext
 	}
 }
 
 // RouteModel determines the appropriate model based on request characteristics
 // Follows claude-code-router getUseModel logic exactly
 func (r *ModelRouter) RouteModel(req *models.ClaudeMessagesRequest) string {
+	// Calculate token count for routing decisions
+	tokenCount := r.estimateTokenCount(req)
+
+	// Apply strategies in order
 	r.mu.RLock()
-	bigModel := r.bigModel
-	smallModel := r.smallModel
-	reasoningModel := r.reasoningModel
-	longContextModel := r.longContextModel
+	strategies := r.strategies
+	defaultModel := r.bigModel // Use bigModel as default
 	r.mu.RUnlock()
 
-	// 1. Handle comma-separated models (direct passthrough) - First priority
+	// Special handling for comma-separated models
 	if strings.Contains(req.Model, ",") {
 		r.logger.WithFields(logrus.Fields{
 			"original_model": req.Model,
@@ -49,48 +249,72 @@ func (r *ModelRouter) RouteModel(req *models.ClaudeMessagesRequest) string {
 		return req.Model
 	}
 
-	// Calculate token count for routing decisions
-	tokenCount := r.estimateTokenCount(req)
-
-	// 2. if tokenCount is greater than 60K, use the long context model - Second priority
-	if tokenCount > 1000*60 && longContextModel != "" {
-		r.logger.WithFields(logrus.Fields{
-			"original_model":   req.Model,
-			"routed_model":     longContextModel,
-			"estimated_tokens": tokenCount,
-			"reason":           "long_context",
-		}).Info("Using long context model due to token count")
-		return longContextModel
+	// Convert request for strategy evaluation
+	routeReq := &RouteRequest{
+		Model:      req.Model,
+		TokenCount: tokenCount,
+		Tools:      make([]interface{}, len(req.Tools)),
+	}
+	for i, tool := range req.Tools {
+		routeReq.Tools[i] = map[string]interface{}{
+			"name":         tool.Name,
+			"description":  tool.Description,
+			"input_schema": tool.InputSchema,
+		}
 	}
 
-	// 3. If the model is claude-3-5-haiku, use the background model - Third priority
-	if strings.HasPrefix(req.Model, "claude-3-5-haiku") && smallModel != "" {
-		r.logger.WithFields(logrus.Fields{
-			"original_model": req.Model,
-			"routed_model":   smallModel,
-			"reason":         "background_model",
-		}).Info("Using background model for haiku")
-		return smallModel
+	// Apply each strategy in priority order
+	for _, strategy := range strategies {
+		shouldApply := false
+
+		// Handle different strategy types
+		switch s := strategy.(type) {
+		case *WebSearchStrategy:
+			shouldApply = s.ShouldApplyToRequest(routeReq)
+		default:
+			shouldApply = strategy.ShouldApply(req, tokenCount)
+		}
+
+		if shouldApply {
+			model := strategy.GetModel()
+			reason := strategy.GetReason()
+
+			// Log routing decision
+			if r.routerLogger != nil && r.routerLogger.IsEnabled() {
+				decision := &RoutingDecision{
+					OriginalModel: req.Model,
+					RoutedModel:   model,
+					Reason:        reason,
+					TokenCount:    tokenCount,
+					HasTools:      len(req.Tools) > 0,
+					HasThinking:   req.Thinking,
+					MessageCount:  len(req.Messages),
+					Metadata: map[string]interface{}{
+						"max_tokens": req.MaxTokens,
+					},
+				}
+				r.routerLogger.LogRoutingDecision(decision)
+			} else {
+				r.logger.WithFields(logrus.Fields{
+					"original_model":   req.Model,
+					"routed_model":     model,
+					"estimated_tokens": tokenCount,
+					"reason":           reason,
+				}).Info("Model routing decision")
+			}
+
+			return model
+		}
 	}
 
-	// 4. if exits thinking, use the think model - Fourth priority
-	if req.Thinking && reasoningModel != "" {
-		r.logger.WithFields(logrus.Fields{
-			"original_model": req.Model,
-			"routed_model":   reasoningModel,
-			"reason":         "thinking_mode",
-		}).Info("Using think model for thinking mode")
-		return reasoningModel
-	}
-
-	// 5. Default model - Final fallback (matches claude-code-router)
+	// Default model - Final fallback
 	r.logger.WithFields(logrus.Fields{
 		"original_model":   req.Model,
-		"routed_model":     bigModel,
+		"routed_model":     defaultModel,
 		"estimated_tokens": tokenCount,
 		"reason":           "default",
 	}).Info("Using default model")
-	return bigModel
+	return defaultModel
 }
 
 // ParseModelCommand parses model command from message content
@@ -121,6 +345,35 @@ func (r *ModelRouter) EstimateTokenCount(req *models.ClaudeMessagesRequest) int 
 
 // estimateTokenCount estimates the token count for a request using tiktoken-compatible logic
 func (r *ModelRouter) estimateTokenCount(req *models.ClaudeMessagesRequest) int {
+	// Use tokenizer if available, fallback to simple estimation
+	if r.tokenCounter != nil {
+		// Convert messages to interface slice for token counter
+		messages := make([]interface{}, len(req.Messages))
+		for i, msg := range req.Messages {
+			messages[i] = map[string]interface{}{
+				"role":    msg.Role,
+				"content": msg.Content,
+			}
+		}
+
+		tokens, err := r.tokenCounter.CountClaudeMessagesTokens(messages, req.System, req.Model)
+		if err == nil {
+			// Add tool tokens if present
+			for _, tool := range req.Tools {
+				toolTokens, _ := r.tokenCounter.CountTokens(tool.Name+" "+tool.Description, req.Model)
+				tokens += toolTokens
+				if tool.InputSchema != nil {
+					// Add schema overhead
+					tokens += 50
+				}
+			}
+			return tokens
+		}
+		// If error, fall back to simple estimation
+		r.logger.WithError(err).Warn("Failed to count tokens with tokenizer, using fallback")
+	}
+
+	// Fallback: simple estimation
 	totalTokens := 0
 
 	// Count system message tokens
@@ -171,6 +424,16 @@ func (r *ModelRouter) estimateTokenCount(req *models.ClaudeMessagesRequest) int 
 
 // countContentTokens counts tokens in content using tiktoken-compatible logic
 func (r *ModelRouter) countContentTokens(content interface{}) int {
+	// Try to use tokenizer if available
+	if r.tokenCounter != nil {
+		model := r.bigModel // Default model for counting
+		tokens, err := r.tokenCounter.CountContentTokens(content, model)
+		if err == nil {
+			return tokens
+		}
+	}
+
+	// Fallback to simple estimation
 	switch c := content.(type) {
 	case string:
 		return r.estimateTextTokens(c)
@@ -231,20 +494,38 @@ func (r *ModelRouter) estimateTextTokens(text string) int {
 		return 0
 	}
 
-	// More accurate token estimation based on tiktoken patterns
-	// Account for punctuation, spaces, and word boundaries
-	chars := len(text)
-	words := len(strings.Fields(text))
+	// Use strings.Builder for efficient analysis
+	var wordCount, punctCount int
+	inWord := false
+
+	for _, char := range text {
+		switch {
+		case char == ' ' || char == '\t' || char == '\n' || char == '\r':
+			inWord = false
+		case char == '.' || char == ',' || char == '!' || char == '?' ||
+			char == ';' || char == ':' || char == '"' || char == '\'' ||
+			char == '(' || char == ')' || char == '[' || char == ']' ||
+			char == '{' || char == '}':
+			punctCount++
+			inWord = false
+		default:
+			if !inWord {
+				wordCount++
+				inWord = true
+			}
+		}
+	}
 
 	// Improved estimation formula based on tiktoken behavior:
 	// - Average 3.3 chars per token for English text
-	// - Punctuation and special characters affect token count
-	// - Word boundaries and spaces are important
+	// - Punctuation affects token count
+	// - Word boundaries are important
+	chars := len(text)
+	baseTokens := chars / 3
+	wordBonus := wordCount / 4
+	punctBonus := punctCount / 10 // Punctuation also contributes to tokens
 
-	baseTokens := chars / 3 // More aggressive than 4 chars per token
-	wordBonus := words / 4  // Account for word boundary effects
-
-	totalTokens := baseTokens + wordBonus
+	totalTokens := baseTokens + wordBonus + punctBonus
 	if totalTokens < 1 && chars > 0 {
 		totalTokens = 1 // Minimum one token for non-empty text
 	}
@@ -355,6 +636,9 @@ func (r *ModelRouter) SetReasoningModel(model string) {
 	r.mu.Lock()
 	r.reasoningModel = model
 	r.mu.Unlock()
+
+	// Reinitialize strategies with new model
+	r.initializeStrategies()
 	r.logger.WithField("model", model).Info("Updated reasoning model")
 }
 
@@ -363,6 +647,9 @@ func (r *ModelRouter) SetLongContextModel(model string) {
 	r.mu.Lock()
 	r.longContextModel = model
 	r.mu.Unlock()
+
+	// Reinitialize strategies with new model
+	r.initializeStrategies()
 	r.logger.WithField("model", model).Info("Updated long context model")
 }
 
@@ -387,8 +674,31 @@ func (r *ModelRouter) UpdateModelConfiguration(bigModel, smallModel string) {
 	r.bigModel = bigModel
 	r.smallModel = smallModel
 	r.mu.Unlock()
+
+	// Reinitialize strategies with new models
+	r.initializeStrategies()
 	r.logger.WithFields(logrus.Fields{
 		"big_model":   bigModel,
 		"small_model": smallModel,
 	}).Info("Updated model router configuration")
+}
+
+// AddCustomStrategy adds a custom routing strategy
+func (r *ModelRouter) AddCustomStrategy(strategy ModelRoutingStrategy, priority int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Insert strategy at specified priority position
+	if priority < 0 || priority > len(r.strategies) {
+		priority = len(r.strategies) // Append at end if invalid priority
+	}
+
+	// Create new slice with capacity for one more element
+	newStrategies := make([]ModelRoutingStrategy, len(r.strategies)+1)
+	copy(newStrategies[:priority], r.strategies[:priority])
+	newStrategies[priority] = strategy
+	copy(newStrategies[priority+1:], r.strategies[priority:])
+
+	r.strategies = newStrategies
+	r.logger.WithField("priority", priority).Info("Added custom routing strategy")
 }

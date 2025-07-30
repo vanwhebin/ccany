@@ -9,14 +9,24 @@ import (
 
 	"ccany/internal/models"
 	"ccany/internal/toolmapping"
+	"github.com/sirupsen/logrus"
 )
 
 // ClaudeConverter handles conversions involving Claude/Anthropic format
-type ClaudeConverter struct{}
+type ClaudeConverter struct {
+	logger *logrus.Logger
+}
 
 // NewClaudeConverter creates a new Claude converter
 func NewClaudeConverter() *ClaudeConverter {
 	return &ClaudeConverter{}
+}
+
+// NewClaudeConverterWithLogger creates a new Claude converter with logger
+func NewClaudeConverterWithLogger(logger *logrus.Logger) *ClaudeConverter {
+	return &ClaudeConverter{
+		logger: logger,
+	}
 }
 
 // ConvertFromOpenAI converts OpenAI response to Claude format
@@ -164,7 +174,7 @@ func (c *ClaudeConverter) convertMessageToClaudeContent(msg models.Message) ([]m
 	cleanedContent := msg.Content
 	if len(msg.ToolCalls) == 0 {
 		var customToolCalls []models.ClaudeContentBlock
-		cleanedContent, customToolCalls = c.parseCustomFormatFromContent(msg.Content)
+		cleanedContent, customToolCalls = c.ParseCustomFormatFromContent(msg.Content)
 		content = append(content, customToolCalls...)
 	}
 
@@ -209,8 +219,8 @@ func (c *ClaudeConverter) mapFinishReasonToClaudeStopReason(finishReason string)
 	}
 }
 
-// parseCustomFormatFromContent parses custom tool call format from content using robust parsing
-func (c *ClaudeConverter) parseCustomFormatFromContent(content string) (string, []models.ClaudeContentBlock) {
+// ParseCustomFormatFromContent parses custom tool call format from content using robust parsing
+func (c *ClaudeConverter) ParseCustomFormatFromContent(content string) (string, []models.ClaudeContentBlock) {
 	parser := NewToolCallParser()
 
 	// First try the robust parser for Unicode formats
@@ -231,21 +241,33 @@ func (c *ClaudeConverter) parseCustomFormatFromContent(content string) (string, 
 func (c *ClaudeConverter) parseEmbeddedJSONToolCalls(content string) ([]models.ClaudeContentBlock, string) {
 	var toolCalls []models.ClaudeContentBlock
 
-	// Look for JSON object with tool_calls - try multiple patterns
-	jsonStart := -1
-	patterns := []string{
-		`{"tool_calls":`,  // Direct JSON
-		`"tool_calls": [`, // Spaced JSON
-		`tool_calls": [`,  // Within larger JSON
+	// Enhanced pattern matching with more variations
+	patterns := []struct {
+		pattern string
+		desc    string
+	}{
+		{`{"tool_calls":`, "Direct JSON"},
+		{`"tool_calls": [`, "Spaced JSON"},
+		{`"tool_calls":[`, "No space JSON"},
+		{`tool_calls": [`, "Within larger JSON"},
+		{`{"tool_calls" :`, "Space before colon"},
+		{`{ "tool_calls":`, "Space after brace"},
+		{`{ "tool_calls" : [`, "Space everywhere"},
+		{`{"tool_calls" : [`, "Space around colon"},
+		{`"tool_calls" : [`, "Quoted with spaces"},
 	}
 
-	for _, pattern := range patterns {
-		if idx := strings.Index(content, pattern); idx != -1 {
+	jsonStart := -1
+	var matchedPattern string
+
+	for _, p := range patterns {
+		if idx := strings.Index(content, p.pattern); idx != -1 {
 			// Find the start of the JSON object by looking backwards for '{'
 			jsonStart = idx
 			for jsonStart > 0 && content[jsonStart] != '{' {
 				jsonStart--
 			}
+			matchedPattern = p.desc
 			break
 		}
 	}
@@ -254,9 +276,13 @@ func (c *ClaudeConverter) parseEmbeddedJSONToolCalls(content string) ([]models.C
 		return toolCalls, content
 	}
 
-	// Find the matching closing brace using bracket counting
+	// Find the matching closing brace using improved bracket counting
 	jsonEnd := c.findMatchingBrace(content, jsonStart)
 	if jsonEnd == -1 {
+		// Log warning but don't fail
+		if c.logger != nil {
+			c.logger.Warnf("Failed to find matching brace for JSON starting at position %d", jsonStart)
+		}
 		return toolCalls, content
 	}
 
@@ -265,7 +291,36 @@ func (c *ClaudeConverter) parseEmbeddedJSONToolCalls(content string) ([]models.C
 	// Fix malformed JSON where arguments is not properly escaped
 	jsonStr = c.fixArgumentsJSON(jsonStr)
 
-	// Parse the JSON structure
+	// Try multiple parsing strategies
+	toolCalls = c.tryParseToolCalls(jsonStr, matchedPattern)
+
+	// Remove JSON tool calls from content only if we successfully parsed them
+	if len(toolCalls) > 0 {
+		beforeJSON := strings.TrimSpace(content[:jsonStart])
+		afterJSON := ""
+		if jsonEnd+1 < len(content) {
+			afterJSON = strings.TrimSpace(content[jsonEnd+1:])
+		}
+
+		// Combine the parts with proper spacing
+		cleanContent := beforeJSON
+		if beforeJSON != "" && afterJSON != "" {
+			cleanContent += " " + afterJSON
+		} else if afterJSON != "" {
+			cleanContent = afterJSON
+		}
+
+		return toolCalls, cleanContent
+	}
+
+	return toolCalls, content
+}
+
+// tryParseToolCalls attempts multiple strategies to parse tool calls
+func (c *ClaudeConverter) tryParseToolCalls(jsonStr string, pattern string) []models.ClaudeContentBlock {
+	var toolCalls []models.ClaudeContentBlock
+
+	// Strategy 1: Standard parsing
 	var toolCallContainer struct {
 		ToolCalls []struct {
 			ID       string `json:"id"`
@@ -279,31 +334,93 @@ func (c *ClaudeConverter) parseEmbeddedJSONToolCalls(content string) ([]models.C
 
 	if err := json.Unmarshal([]byte(jsonStr), &toolCallContainer); err == nil {
 		for _, tc := range toolCallContainer.ToolCalls {
-			// Parse function arguments
-			var args map[string]interface{}
-			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err == nil {
-				// Map tool name to Claude tool name
-				claudeToolName := c.mapToolName(tc.Function.Name)
-
-				toolCalls = append(toolCalls, models.ClaudeContentBlock{
-					Type:  "tool_use",
-					ID:    tc.ID,
-					Name:  claudeToolName,
-					Input: args,
-				})
+			// Parse function arguments with error handling
+			args, err := c.parseToolArguments(tc.Function.Arguments)
+			if err != nil {
+				// Log but continue with empty args
+				if c.logger != nil {
+					c.logger.Warnf("Failed to parse tool arguments for %s: %v", tc.Function.Name, err)
+				}
+				args = make(map[string]interface{})
 			}
+
+			// Map tool name to Claude tool name
+			claudeToolName := c.mapToolName(tc.Function.Name)
+
+			toolCalls = append(toolCalls, models.ClaudeContentBlock{
+				Type:  "tool_use",
+				ID:    tc.ID,
+				Name:  claudeToolName,
+				Input: args,
+			})
+		}
+		return toolCalls
+	}
+
+	// Strategy 2: Try alternative structure where arguments might be an object
+	var altContainer struct {
+		ToolCalls []struct {
+			ID       string `json:"id"`
+			Type     string `json:"type"`
+			Function struct {
+				Name      string                 `json:"name"`
+				Arguments map[string]interface{} `json:"arguments"`
+			} `json:"function"`
+		} `json:"tool_calls"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &altContainer); err == nil {
+		for _, tc := range altContainer.ToolCalls {
+			claudeToolName := c.mapToolName(tc.Function.Name)
+			toolCalls = append(toolCalls, models.ClaudeContentBlock{
+				Type:  "tool_use",
+				ID:    tc.ID,
+				Name:  claudeToolName,
+				Input: tc.Function.Arguments,
+			})
+		}
+		return toolCalls
+	}
+
+	// Log failure if debug logging is available
+	if c.logger != nil {
+		c.logger.Debugf("Failed to parse tool calls from JSON (pattern: %s): %s", pattern, jsonStr)
+	}
+
+	return toolCalls
+}
+
+// parseToolArguments safely parses tool arguments from string
+func (c *ClaudeConverter) parseToolArguments(argsStr string) (map[string]interface{}, error) {
+	if argsStr == "" {
+		return make(map[string]interface{}), nil
+	}
+
+	var args map[string]interface{}
+
+	// Try direct parsing first
+	if err := json.Unmarshal([]byte(argsStr), &args); err == nil {
+		return args, nil
+	}
+
+	// Try fixing common issues
+	// 1. Unescape if double-escaped
+	if strings.Contains(argsStr, "\\\"") {
+		unescaped := strings.ReplaceAll(argsStr, "\\\"", "\"")
+		unescaped = strings.ReplaceAll(unescaped, "\\\\", "\\")
+		if err := json.Unmarshal([]byte(unescaped), &args); err == nil {
+			return args, nil
 		}
 	}
 
-	// Remove JSON tool calls from content
-	beforeJSON := content[:jsonStart]
-	afterJSON := ""
-	if jsonEnd+1 < len(content) {
-		afterJSON = content[jsonEnd+1:]
+	// 2. Try wrapping in quotes if it looks like it's missing them
+	if !strings.HasPrefix(argsStr, "{") && !strings.HasPrefix(argsStr, "[") {
+		if err := json.Unmarshal([]byte("\""+argsStr+"\""), &args); err == nil {
+			return args, nil
+		}
 	}
-	cleanContent := strings.TrimSpace(beforeJSON + afterJSON)
 
-	return toolCalls, cleanContent
+	return nil, fmt.Errorf("unable to parse arguments: %s", argsStr)
 }
 
 // findMatchingBrace finds the matching closing brace for JSON
@@ -380,17 +497,36 @@ func (c *ClaudeConverter) mapToolName(toolName string) string {
 
 // fixArgumentsJSON fixes malformed JSON where arguments contains unescaped nested JSON
 func (c *ClaudeConverter) fixArgumentsJSON(jsonStr string) string {
-	pattern := `"arguments": "`
-	start := strings.Index(jsonStr, pattern)
-	if start == -1 {
-		return jsonStr
+	// Try multiple patterns for arguments field
+	patterns := []string{
+		`"arguments": "`,
+		`"arguments":"`,
+		`"arguments" : "`,
+		`"arguments" :"`,
 	}
 
-	contentStart := start + len(pattern)
+	for _, pattern := range patterns {
+		start := strings.Index(jsonStr, pattern)
+		if start != -1 {
+			fixedStr := c.fixArgumentsAtPosition(jsonStr, start, len(pattern))
+			if fixedStr != jsonStr {
+				return fixedStr
+			}
+		}
+	}
+
+	return jsonStr
+}
+
+// fixArgumentsAtPosition fixes arguments JSON at a specific position
+func (c *ClaudeConverter) fixArgumentsAtPosition(jsonStr string, start int, patternLen int) string {
+	contentStart := start + patternLen
 	braceCount := 0
+	bracketCount := 0
 	i := contentStart
 	var contentEnd int = -1
 	escaped := false
+	inString := false
 
 	for i < len(jsonStr) {
 		char := jsonStr[i]
@@ -407,20 +543,31 @@ func (c *ClaudeConverter) fixArgumentsJSON(jsonStr string) string {
 			continue
 		}
 
-		if char == '{' {
-			braceCount++
-		} else if char == '}' {
-			braceCount--
-			if braceCount == 0 {
-				for j := i + 1; j < len(jsonStr); j++ {
-					if jsonStr[j] == '"' {
-						contentEnd = j
-						break
-					}
+		// Track string boundaries to avoid counting braces inside strings
+		if char == '"' && (i == contentStart || jsonStr[i-1] != '\\') {
+			if !inString {
+				// Check if this quote ends the arguments value
+				if braceCount == 0 && bracketCount == 0 && i > contentStart {
+					contentEnd = i
+					break
 				}
-				break
+			}
+			inString = !inString
+		}
+
+		if !inString {
+			switch char {
+			case '{':
+				braceCount++
+			case '}':
+				braceCount--
+			case '[':
+				bracketCount++
+			case ']':
+				bracketCount--
 			}
 		}
+
 		i++
 	}
 
@@ -429,16 +576,36 @@ func (c *ClaudeConverter) fixArgumentsJSON(jsonStr string) string {
 	}
 
 	unescapedContent := jsonStr[contentStart:contentEnd]
-	step1Replacer := strings.NewReplacer(`\"`, "__ESCAPED_QUOTE__")
-	tempContent := step1Replacer.Replace(unescapedContent)
-	step2Replacer := strings.NewReplacer(
-		`"`, `\"`,
-		"__ESCAPED_QUOTE__", `\"`,
-	)
-	escapedContent := step2Replacer.Replace(tempContent)
-	result := jsonStr[:contentStart] + escapedContent + jsonStr[contentEnd:]
 
+	// More sophisticated escaping
+	escapedContent := c.escapeJSONString(unescapedContent)
+
+	result := jsonStr[:contentStart] + escapedContent + jsonStr[contentEnd:]
 	return result
+}
+
+// escapeJSONString properly escapes a string for JSON
+func (c *ClaudeConverter) escapeJSONString(s string) string {
+	// First preserve already escaped quotes
+	s = strings.ReplaceAll(s, `\"`, "\x00")
+
+	// Escape unescaped quotes
+	s = strings.ReplaceAll(s, `"`, `\"`)
+
+	// Restore already escaped quotes
+	s = strings.ReplaceAll(s, "\x00", `\"`)
+
+	// Escape other special characters
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	s = strings.ReplaceAll(s, "\t", `\t`)
+
+	// Fix double escaping
+	s = strings.ReplaceAll(s, `\\n`, `\n`)
+	s = strings.ReplaceAll(s, `\\r`, `\r`)
+	s = strings.ReplaceAll(s, `\\t`, `\t`)
+
+	return s
 }
 
 // hasToolUseContent checks if content contains tool_use blocks

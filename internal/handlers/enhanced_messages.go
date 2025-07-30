@@ -14,6 +14,7 @@ import (
 	"ccany/internal/converter"
 	"ccany/internal/logging"
 	"ccany/internal/models"
+	"ccany/internal/tokenizer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,27 +23,31 @@ import (
 
 // EnhancedMessagesHandler handles Claude messages API requests with Claude Code compatibility
 type EnhancedMessagesHandler struct {
-	config           *config.Config
-	configManager    *app.ConfigManager
-	openaiClient     *client.OpenAIClient
-	requestLogger    *logging.RequestLogger
-	logger           *logrus.Logger
-	streamingService *claudecode.StreamingService
-	modelRouter      *claudecode.ModelRouter
-	configService    *claudecode.ConfigService
+	config             *config.Config
+	configManager      *app.ConfigManager
+	openaiClient       *client.OpenAIClient
+	requestLogger      *logging.RequestLogger
+	logger             *logrus.Logger
+	streamingService   *claudecode.StreamingService
+	modelRouter        *claudecode.ModelRouter
+	configService      *claudecode.ConfigService
+	tokenCounter       *tokenizer.TokenCounter
+	reasoningProcessor *claudecode.ReasoningProcessor
 }
 
 // NewEnhancedMessagesHandler creates a new enhanced messages handler
 func NewEnhancedMessagesHandler(cfg *config.Config, configManager *app.ConfigManager, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger) *EnhancedMessagesHandler {
 	return &EnhancedMessagesHandler{
-		config:           cfg,
-		configManager:    configManager,
-		openaiClient:     openaiClient,
-		requestLogger:    requestLogger,
-		logger:           logger,
-		streamingService: claudecode.NewStreamingService(logger),
-		modelRouter:      claudecode.NewModelRouter(logger, cfg.BigModel, cfg.SmallModel),
-		configService:    claudecode.NewConfigService(logger),
+		config:             cfg,
+		configManager:      configManager,
+		openaiClient:       openaiClient,
+		requestLogger:      requestLogger,
+		logger:             logger,
+		streamingService:   claudecode.NewStreamingService(logger),
+		modelRouter:        claudecode.NewModelRouter(logger, cfg.BigModel, cfg.SmallModel),
+		configService:      claudecode.NewConfigService(logger, configManager.GetConfigService(), context.Background()),
+		tokenCounter:       tokenizer.NewTokenCounter(logger),
+		reasoningProcessor: claudecode.NewReasoningProcessor(logger),
 	}
 }
 
@@ -166,6 +171,12 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 	// Initialize Claude Code compatible streaming
 	streamCtx := h.streamingService.InitializeStreaming(c, requestID, claudeReq.Model)
 
+	// Initialize reasoning/thinking support if enabled
+	var reasoningCtx *claudecode.ReasoningContext
+	if claudeReq.Thinking {
+		reasoningCtx = h.reasoningProcessor.InitializeThinkingBlock(c, streamCtx, true)
+	}
+
 	// Check for client disconnect before starting stream
 	if h.streamingService.CheckClientDisconnect(c) {
 		h.logger.WithField("request_id", requestID).Info("Client disconnected before stream start")
@@ -228,8 +239,8 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 		}
 
 		if chunk.Data != nil {
-			// Process chunk data with Claude Code events
-			h.processStreamChunk(c, streamCtx, chunk.Data, &totalInputTokens, &totalOutputTokens)
+			// Process chunk data with Claude Code events and reasoning support
+			h.processStreamChunk(c, streamCtx, chunk.Data, &totalInputTokens, &totalOutputTokens, reasoningCtx)
 		}
 	}
 
@@ -240,6 +251,11 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 	stopReason := "end_turn"
 	if hasError {
 		stopReason = "error"
+	}
+
+	// Finalize reasoning block if enabled
+	if reasoningCtx != nil {
+		h.reasoningProcessor.FinalizeThinkingBlock(c, reasoningCtx)
 	}
 
 	// Finalize streaming with proper Claude Code events
@@ -261,12 +277,26 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 }
 
 // processStreamChunk processes individual stream chunks and converts them to Claude Code events
-func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *claudecode.StreamingContext, data interface{}, inputTokens, outputTokens *int) {
+func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *claudecode.StreamingContext, data interface{}, inputTokens, outputTokens *int, reasoningCtx *claudecode.ReasoningContext) {
 	// Handle OpenAIStreamResponse type
 	if streamResp, ok := data.(*models.OpenAIStreamResponse); ok {
 		// Handle choices
 		if len(streamResp.Choices) > 0 {
 			choice := streamResp.Choices[0]
+
+			// Process reasoning content if present
+			if reasoningCtx != nil {
+				deltaMap := map[string]interface{}{
+					"content": choice.Delta.Content,
+				}
+				// Check for reasoning content in delta
+				if h.reasoningProcessor.ProcessReasoningDelta(c, streamCtx, reasoningCtx, deltaMap) {
+					// Reasoning was processed, skip regular content processing if no other content
+					if choice.Delta.Content == "" && len(choice.Delta.ToolCalls) == 0 {
+						return
+					}
+				}
+			}
 
 			// Handle delta content
 			if choice.Delta.Content != "" {
@@ -319,6 +349,13 @@ func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *
 					// Handle delta content
 					if delta, exists := choice["delta"]; exists {
 						if deltaMap, ok := delta.(map[string]interface{}); ok {
+							// Process reasoning content if present
+							if reasoningCtx != nil {
+								if h.reasoningProcessor.ProcessReasoningDelta(c, streamCtx, reasoningCtx, deltaMap) {
+									// Reasoning was processed, check for other content
+								}
+							}
+
 							// Handle text content
 							if content, exists := deltaMap["content"]; exists {
 								if contentStr, ok := content.(string); ok {

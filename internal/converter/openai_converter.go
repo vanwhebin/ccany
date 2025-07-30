@@ -203,20 +203,23 @@ func (c *OpenAIConverter) convertTools(claudeTools []models.ClaudeTool) ([]model
 	var openaiTools []models.OpenAITool
 
 	for _, tool := range claudeTools {
+		// Convert Claude tool name to OpenAI tool name
+		openaiToolName := c.mapClaudeToolNameToOpenAI(tool.Name)
+
 		// 增强工具描述，明确指出何时使用
 		enhancedDescription := tool.Description
-		if tool.Name == "str_replace_editor" || tool.Name == "str_replace_based_edit_tool" {
+		if openaiToolName == "str_replace_editor" || openaiToolName == "str_replace_based_edit_tool" {
 			enhancedDescription += " MUST be used when creating, editing or modifying files. Required for all file operations."
-		} else if tool.Name == "bash" {
+		} else if openaiToolName == "bash" {
 			enhancedDescription += " MUST be used when executing system commands, running scripts or performing system operations."
-		} else if strings.Contains(strings.ToLower(tool.Name), "file") {
+		} else if strings.Contains(strings.ToLower(openaiToolName), "file") {
 			enhancedDescription += " MUST be used for file operations."
 		}
 
 		openaiTool := models.OpenAITool{
 			Type: "function",
 			Function: models.OpenAIFunctionDef{
-				Name:        tool.Name,
+				Name:        openaiToolName,
 				Description: enhancedDescription,
 				Parameters:  tool.InputSchema,
 			},
@@ -257,6 +260,49 @@ func (c *OpenAIConverter) convertToolChoice(claudeToolChoice interface{}) interf
 	}
 
 	return "auto"
+}
+
+// mapClaudeToolNameToOpenAI maps Claude tool names to OpenAI tool names
+func (c *OpenAIConverter) mapClaudeToolNameToOpenAI(claudeToolName string) string {
+	// Direct mappings from Claude Code tools to OpenAI-compatible tools
+	claudeToOpenAIMappings := map[string]string{
+		// File operations
+		"write_to_file":      "str_replace_editor",
+		"read_file":          "str_replace_editor",
+		"apply_diff":         "str_replace_based_edit_tool",
+		"edit_file":          "str_replace_editor",
+		"search_and_replace": "str_replace_editor",
+		"insert_content":     "str_replace_editor",
+
+		// Command execution
+		"execute_command": "bash",
+
+		// Browser/UI operations
+		"browser_action": "computer",
+
+		// Search operations
+		"search_files": "grep",
+		"list_files":   "ls",
+
+		// Other Claude Code tools that don't need mapping
+		"ask_followup_question":      "ask_followup_question",
+		"attempt_completion":         "attempt_completion",
+		"use_mcp_tool":               "use_mcp_tool",
+		"access_mcp_resource":        "access_mcp_resource",
+		"fetch_instructions":         "fetch_instructions",
+		"list_code_definition_names": "list_code_definition_names",
+		"switch_mode":                "switch_mode",
+		"new_task":                   "new_task",
+		"update_todo_list":           "update_todo_list",
+	}
+
+	// Check for direct mapping
+	if openaiName, exists := claudeToOpenAIMappings[claudeToolName]; exists {
+		return openaiName
+	}
+
+	// Return original name if no mapping found
+	return claudeToolName
 }
 
 // containsFileOperationTools checks if the tools contain file operation capabilities

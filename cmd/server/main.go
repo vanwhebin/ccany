@@ -87,7 +87,7 @@ func main() {
 	logger.SetFormatter(&logrus.JSONFormatter{})
 
 	// Initialize Claude Code configuration
-	claudeConfigService := claudecode.NewConfigService(logger)
+	claudeConfigService := claudecode.NewConfigService(logger, configManager.GetConfigService(), ctx)
 	if err := claudeConfigService.InitializeConfig(); err != nil {
 		logger.WithError(err).Error("Failed to initialize Claude Code configuration")
 	} else {

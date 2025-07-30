@@ -3,26 +3,17 @@ package tests
 import (
 	"ccany/internal/claudecode"
 	"ccany/internal/models"
-	"github.com/sirupsen/logrus"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestClaudeCodeFixes(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel) // Reduce log noise during tests
 
-	t.Run("ConfigService", func(t *testing.T) {
-		configService := claudecode.NewConfigService(logger)
-
-		// Test config path
-		if configService.GetConfigPath() == "" {
-			t.Error("Config path should not be empty")
-		}
-
-		// Test config existence check
-		exists := configService.ConfigExists()
-		t.Logf("Config exists: %v", exists)
-	})
+	// Note: ConfigService tests have been removed as it now uses database storage
+	// instead of JSON files
 
 	t.Run("ModelRouter", func(t *testing.T) {
 		modelRouter := claudecode.NewModelRouter(logger, "gpt-4", "gpt-3.5-turbo")

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"ccany/internal/toolmapping"
+	"ccany/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,11 +19,13 @@ import (
 
 // StreamingService handles Claude Code compatible streaming responses
 type StreamingService struct {
-	logger *logrus.Logger
+	logger      *logrus.Logger
+	contextPool sync.Pool // 对象池复用StreamingContext
 }
 
-// StreamingContext holds context for a streaming request
+// StreamingContext holds context for a streaming request with thread safety
 type StreamingContext struct {
+	mu               sync.RWMutex // 保护并发访问
 	RequestID        string
 	Model            string
 	ContentBuffer    *bytes.Buffer
@@ -30,6 +34,7 @@ type StreamingContext struct {
 	CurrentToolCalls map[string]*ToolCallState // Track tool calls by index
 	TextBlockIndex   int
 	ToolBlockCounter int
+	closed           bool // 标记上下文是否已关闭
 }
 
 // ToolCallState tracks the state of a tool call during streaming
@@ -46,6 +51,14 @@ type ToolCallState struct {
 func NewStreamingService(logger *logrus.Logger) *StreamingService {
 	return &StreamingService{
 		logger: logger,
+		contextPool: sync.Pool{
+			New: func() interface{} {
+				return &StreamingContext{
+					ContentBuffer:    &bytes.Buffer{},
+					CurrentToolCalls: make(map[string]*ToolCallState),
+				}
+			},
+		},
 	}
 }
 
@@ -61,16 +74,25 @@ func (s *StreamingService) InitializeStreaming(c *gin.Context, requestID, model 
 
 	messageID := fmt.Sprintf("msg_%s", uuid.New().String()[:24])
 
-	streamCtx := &StreamingContext{
-		RequestID:        requestID,
-		Model:            model,
-		ContentBuffer:    &bytes.Buffer{},
-		MessageID:        messageID,
-		StartTime:        time.Now(),
-		CurrentToolCalls: make(map[string]*ToolCallState),
-		TextBlockIndex:   0,
-		ToolBlockCounter: 0,
+	// 从对象池获取上下文
+	streamCtx := s.contextPool.Get().(*StreamingContext)
+
+	// 重置上下文状态
+	streamCtx.mu.Lock()
+	streamCtx.RequestID = requestID
+	streamCtx.Model = model
+	streamCtx.ContentBuffer.Reset()
+	streamCtx.MessageID = messageID
+	streamCtx.StartTime = time.Now()
+	streamCtx.TextBlockIndex = 0
+	streamCtx.ToolBlockCounter = 0
+	streamCtx.closed = false
+
+	// 清理旧的tool calls
+	for k := range streamCtx.CurrentToolCalls {
+		delete(streamCtx.CurrentToolCalls, k)
 	}
+	streamCtx.mu.Unlock()
 
 	// Send message_start event - matches claude-code-proxy exactly
 	messageStartEvent := map[string]interface{}{
@@ -122,13 +144,16 @@ func (s *StreamingService) ProcessTextChunk(c *gin.Context, streamCtx *Streaming
 		return
 	}
 
+	streamCtx.mu.Lock()
 	// Add to content buffer
 	streamCtx.ContentBuffer.WriteString(text)
+	textBlockIndex := streamCtx.TextBlockIndex
+	streamCtx.mu.Unlock()
 
 	// Send content_block_delta event - matches claude-code-proxy format
 	deltaEvent := map[string]interface{}{
 		"type":  "content_block_delta",
-		"index": streamCtx.TextBlockIndex,
+		"index": textBlockIndex,
 		"delta": map[string]interface{}{
 			"type": "text_delta",
 			"text": text,
@@ -144,11 +169,15 @@ func (s *StreamingService) ProcessTextChunk(c *gin.Context, streamCtx *Streaming
 
 // ProcessToolCallDeltas processes tool call deltas from OpenAI streaming - enhanced for Claude Code compatibility
 func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *StreamingContext, toolCallDeltas []interface{}) {
+	streamCtx.mu.Lock()
+	defer streamCtx.mu.Unlock()
+
 	for _, tcDelta := range toolCallDeltas {
 		if tcDeltaMap, ok := tcDelta.(map[string]interface{}); ok {
 			// Get index as integer, not string
 			indexFloat, ok := tcDeltaMap["index"].(float64)
 			if !ok {
+				s.logger.Warn("Tool call delta missing or invalid index")
 				continue
 			}
 			tcIndex := int(indexFloat)
@@ -205,41 +234,49 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 						s.writeSSEEvent(c, "content_block_start", toolStartEvent)
 					}
 
-					// Handle function arguments with better JSON validation
+					// Handle function arguments with intelligent parsing
 					if arguments, exists := functionMap["arguments"]; exists && toolCall.Started && arguments != nil {
 						if argsStr, ok := arguments.(string); ok && argsStr != "" {
 							toolCall.ArgsBuffer += argsStr
 
-							// Enhanced JSON parsing with validation
-							var parsedArgs interface{}
-							if err := json.Unmarshal([]byte(toolCall.ArgsBuffer), &parsedArgs); err == nil {
-								// Valid JSON - send complete input
-								if !toolCall.JSONSent {
+							// Try to parse the complete arguments with fallback strategies
+							parsedJSON, parseErr := utils.ParseToolArguments(toolCall.ArgsBuffer)
+
+							// Log parsing attempt
+							s.logger.WithFields(logrus.Fields{
+								"tool_name":    toolCall.Name,
+								"buffer_len":   len(toolCall.ArgsBuffer),
+								"parse_result": parsedJSON,
+								"parse_error":  parseErr,
+							}).Debug("Tool arguments parsing attempt")
+
+							if parseErr == nil && parsedJSON != "{}" {
+								// Successfully parsed - send complete input
+								var parsedArgs interface{}
+								if err := json.Unmarshal([]byte(parsedJSON), &parsedArgs); err == nil && !toolCall.JSONSent {
 									toolDeltaEvent := map[string]interface{}{
 										"type":  "content_block_delta",
 										"index": toolCall.ClaudeIndex,
 										"delta": map[string]interface{}{
 											"type":       "input_json_delta",
-											"input_json": parsedArgs, // Send parsed JSON instead of string
+											"input_json": parsedArgs,
 										},
 									}
 									s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
 									toolCall.JSONSent = true
 								}
-							} else {
-								// Incomplete JSON - send partial if we have some content
-								if len(toolCall.ArgsBuffer) > 2 && !toolCall.JSONSent {
-									// Only send partial for substantial content to avoid spam
-									toolDeltaEvent := map[string]interface{}{
-										"type":  "content_block_delta",
-										"index": toolCall.ClaudeIndex,
-										"delta": map[string]interface{}{
-											"type":         "input_json_delta",
-											"partial_json": toolCall.ArgsBuffer,
-										},
-									}
-									s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
+							} else if len(toolCall.ArgsBuffer) > 10 && !toolCall.JSONSent {
+								// Buffer has substantial content but can't parse yet
+								// Send partial JSON for better streaming experience
+								toolDeltaEvent := map[string]interface{}{
+									"type":  "content_block_delta",
+									"index": toolCall.ClaudeIndex,
+									"delta": map[string]interface{}{
+										"type":         "input_json_delta",
+										"partial_json": toolCall.ArgsBuffer,
+									},
 								}
+								s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
 							}
 						}
 					}
@@ -256,6 +293,12 @@ func (s *StreamingService) ProcessToolCallDeltas(c *gin.Context, streamCtx *Stre
 
 // FinalizeStreaming sends final Claude Code compatible events
 func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *StreamingContext, stopReason string, inputTokens, outputTokens int) {
+	streamCtx.mu.Lock()
+	defer streamCtx.mu.Unlock()
+
+	// Mark context as closed
+	streamCtx.closed = true
+
 	// Send content_block_stop event for text block
 	contentBlockStopEvent := map[string]interface{}{
 		"type":  "content_block_stop",
@@ -263,9 +306,26 @@ func (s *StreamingService) FinalizeStreaming(c *gin.Context, streamCtx *Streamin
 	}
 	s.writeSSEEvent(c, "content_block_stop", contentBlockStopEvent)
 
-	// Send content_block_stop events for all tool calls
+	// Send content_block_stop events for all tool calls with final parsing
 	for _, toolCall := range streamCtx.CurrentToolCalls {
 		if toolCall.Started {
+			// Final attempt to parse and send complete arguments if not sent yet
+			if !toolCall.JSONSent && toolCall.ArgsBuffer != "" {
+				parsedJSON, _ := utils.ParseToolArguments(toolCall.ArgsBuffer)
+				var parsedArgs interface{}
+				if err := json.Unmarshal([]byte(parsedJSON), &parsedArgs); err == nil {
+					toolDeltaEvent := map[string]interface{}{
+						"type":  "content_block_delta",
+						"index": toolCall.ClaudeIndex,
+						"delta": map[string]interface{}{
+							"type":       "input_json_delta",
+							"input_json": parsedArgs,
+						},
+					}
+					s.writeSSEEvent(c, "content_block_delta", toolDeltaEvent)
+				}
+			}
+
 			toolStopEvent := map[string]interface{}{
 				"type":  "content_block_stop",
 				"index": toolCall.ClaudeIndex,
@@ -323,11 +383,30 @@ func (s *StreamingService) UpdateUsageTokens(streamCtx *StreamingContext, inputT
 
 // GetStreamingStats returns statistics about the streaming session
 func (s *StreamingService) GetStreamingStats(streamCtx *StreamingContext) map[string]interface{} {
+	if streamCtx == nil {
+		return map[string]interface{}{
+			"error": "streaming context is nil",
+		}
+	}
+
+	streamCtx.mu.RLock()
+	defer streamCtx.mu.RUnlock()
+
+	contentLength := 0
+	if streamCtx.ContentBuffer != nil {
+		contentLength = streamCtx.ContentBuffer.Len()
+	}
+
+	duration := int64(0)
+	if !streamCtx.StartTime.IsZero() {
+		duration = time.Since(streamCtx.StartTime).Milliseconds()
+	}
+
 	return map[string]interface{}{
 		"message_id":     streamCtx.MessageID,
 		"request_id":     streamCtx.RequestID,
-		"content_length": streamCtx.ContentBuffer.Len(),
-		"duration_ms":    time.Since(streamCtx.StartTime).Milliseconds(),
+		"content_length": contentLength,
+		"duration_ms":    duration,
 	}
 }
 
@@ -377,4 +456,22 @@ func (s *StreamingService) writeSSEEvent(c *gin.Context, event string, data inte
 	if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, string(jsonData)); err != nil {
 		s.logger.WithError(err).Debug("Failed to write SSE event - client may have disconnected")
 	}
+}
+
+// CleanupContext returns the streaming context to the pool for reuse
+func (s *StreamingService) CleanupContext(streamCtx *StreamingContext) {
+	streamCtx.mu.Lock()
+	defer streamCtx.mu.Unlock()
+
+	if !streamCtx.closed {
+		s.logger.Warn("Cleaning up unclosed streaming context")
+	}
+
+	// Clear sensitive data before returning to pool
+	streamCtx.RequestID = ""
+	streamCtx.Model = ""
+	streamCtx.MessageID = ""
+
+	// Return to pool
+	s.contextPool.Put(streamCtx)
 }

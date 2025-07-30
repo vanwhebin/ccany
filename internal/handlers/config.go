@@ -65,6 +65,14 @@ type BulkConfigUpdateRequest struct {
 	LogLevel         string `json:"log_level"`
 	JWTSecret        string `json:"jwt_secret"`
 	EncryptAlgorithm string `json:"encrypt_algorithm"`
+	// 代理配置字段
+	ProxyEnabled          bool   `json:"proxy_enabled"`
+	ProxyType             string `json:"proxy_type"`
+	HTTPProxy             string `json:"http_proxy"`
+	SOCKS5Proxy           string `json:"socks5_proxy"`
+	SOCKS5ProxyUser       string `json:"socks5_proxy_user"`
+	SOCKS5ProxyPassword   string `json:"socks5_proxy_password"`
+	IgnoreSSLVerification bool   `json:"ignore_ssl_verification"`
 }
 
 // GetAllConfigs gets all configurations - GET /admin/configs
@@ -174,9 +182,25 @@ func (h *ConfigHandler) GetConfigObject(c *gin.Context) {
 	jwtSecret, _ := h.configManager.GetConfigValue("jwt_secret")
 	encryptAlgo, _ := h.configManager.GetConfigValue("encrypt_algorithm")
 
+	// Get proxy configuration fields
+	proxyEnabled, _ := h.configManager.GetConfigValue(config.KeyProxyEnabled)
+	proxyType, _ := h.configManager.GetConfigValue(config.KeyProxyType)
+	httpProxy, _ := h.configManager.GetConfigValue(config.KeyHTTPProxy)
+	socks5Proxy, _ := h.configManager.GetConfigValue(config.KeySOCKS5Proxy)
+	socks5ProxyUser, _ := h.configManager.GetConfigValue(config.KeySOCKS5ProxyUser)
+	socks5ProxyPassword, _ := h.configManager.GetConfigValue(config.KeySOCKS5ProxyPassword)
+	ignoreSSL, _ := h.configManager.GetConfigValue(config.KeyIgnoreSSLVerification)
+
 	// Add these fields to response
 	configResponse["jwt_secret"] = jwtSecret
 	configResponse["encrypt_algorithm"] = encryptAlgo
+	configResponse["proxy_enabled"] = proxyEnabled
+	configResponse["proxy_type"] = proxyType
+	configResponse["http_proxy"] = httpProxy
+	configResponse["socks5_proxy"] = socks5Proxy
+	configResponse["socks5_proxy_user"] = socks5ProxyUser
+	configResponse["socks5_proxy_password"] = socks5ProxyPassword
+	configResponse["ignore_ssl_verification"] = ignoreSSL
 
 	h.logger.Info("Returning config object")
 	c.JSON(http.StatusOK, gin.H{
@@ -314,6 +338,14 @@ func (h *ConfigHandler) UpdateBulkConfig(c *gin.Context) {
 		"log_level":         {key: config.KeyLogLevel, value: req.LogLevel, encrypted: false, shouldUpdate: req.LogLevel != ""},
 		"jwt_secret":        {key: "jwt_secret", value: req.JWTSecret, encrypted: false, shouldUpdate: req.JWTSecret != ""},
 		"encrypt_algorithm": {key: "encrypt_algorithm", value: req.EncryptAlgorithm, encrypted: false, shouldUpdate: req.EncryptAlgorithm != ""},
+		// 代理配置
+		"proxy_enabled":           {key: config.KeyProxyEnabled, value: strconv.FormatBool(req.ProxyEnabled), encrypted: false, shouldUpdate: true},
+		"proxy_type":              {key: config.KeyProxyType, value: req.ProxyType, encrypted: false, shouldUpdate: req.ProxyType != ""},
+		"http_proxy":              {key: config.KeyHTTPProxy, value: req.HTTPProxy, encrypted: false, shouldUpdate: req.HTTPProxy != ""},
+		"socks5_proxy":            {key: config.KeySOCKS5Proxy, value: req.SOCKS5Proxy, encrypted: false, shouldUpdate: req.SOCKS5Proxy != ""},
+		"socks5_proxy_user":       {key: config.KeySOCKS5ProxyUser, value: req.SOCKS5ProxyUser, encrypted: false, shouldUpdate: req.SOCKS5ProxyUser != ""},
+		"socks5_proxy_password":   {key: config.KeySOCKS5ProxyPassword, value: req.SOCKS5ProxyPassword, encrypted: true, shouldUpdate: req.SOCKS5ProxyPassword != ""},
+		"ignore_ssl_verification": {key: config.KeyIgnoreSSLVerification, value: strconv.FormatBool(req.IgnoreSSLVerification), encrypted: false, shouldUpdate: true},
 	}
 
 	// Validate all values first
@@ -407,10 +439,40 @@ func (h *ConfigHandler) TestConfig(c *gin.Context) {
 		return
 	}
 
+	// 构建与前端兼容的响应格式
+	results := []gin.H{
+		{
+			"service": "Configuration",
+			"status":  "Valid",
+		},
+		{
+			"service": "Database",
+			"status":  "Connected",
+		},
+	}
+
+	// 如果配置了API密钥，添加API状态
+	cfg, err := h.configManager.GetConfig()
+	if err == nil {
+		if cfg.OpenAIAPIKey != "" {
+			results = append(results, gin.H{
+				"service": "OpenAI API",
+				"status":  "Configured",
+			})
+		}
+		if cfg.ClaudeAPIKey != "" {
+			results = append(results, gin.H{
+				"service": "Claude API",
+				"status":  "Configured",
+			})
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"valid":      true,
 		"configured": configured,
 		"status":     "Configuration is valid",
+		"results":    results, // 添加前端期望的results字段
 	})
 }
 

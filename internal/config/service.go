@@ -52,6 +52,28 @@ const (
 	KeySOCKS5ProxyUser       = "socks5_proxy_user"
 	KeySOCKS5ProxyPassword   = "socks5_proxy_password"
 	KeyIgnoreSSLVerification = "ignore_ssl_verification"
+
+	// Claude Code 配置键
+	KeyClaudeCodeUserID                 = "claude_code_user_id"
+	KeyClaudeCodeNumStartups            = "claude_code_num_startups"
+	KeyClaudeCodeAutoUpdaterStatus      = "claude_code_auto_updater_status"
+	KeyClaudeCodeHasCompletedOnboarding = "claude_code_has_completed_onboarding"
+	KeyClaudeCodeLastOnboardingVersion  = "claude_code_last_onboarding_version"
+	KeyClaudeCodeInstallationID         = "claude_code_installation_id"
+	KeyClaudeCodeTelemetryEnabled       = "claude_code_telemetry_enabled"
+	KeyClaudeCodeAnalyticsEnabled       = "claude_code_analytics_enabled"
+	KeyClaudeCodeCrashReportingEnabled  = "claude_code_crash_reporting_enabled"
+
+	// Claude Code Router 配置键
+	KeyRouterDefault                  = "router_default_model"
+	KeyRouterBackground               = "router_background_model"
+	KeyRouterThink                    = "router_think_model"
+	KeyRouterLongContext              = "router_long_context_model"
+	KeyRouterWebSearch                = "router_web_search_model"
+	KeyRouterLongContextThreshold     = "router_long_context_threshold"
+	KeyRouterEnableWebSearchDetection = "router_enable_web_search_detection"
+	KeyRouterEnableToolUseDetection   = "router_enable_tool_use_detection"
+	KeyRouterEnableDynamicRouting     = "router_enable_dynamic_routing"
 )
 
 // GetConfig gets configuration value
@@ -187,6 +209,26 @@ func (s *Service) InitializeDefaultConfigs(ctx context.Context) error {
 		KeyStreamEnabled:   {"true", false},
 		KeyRateLimitRPM:    {"60", false},
 		KeyRateLimitTPM:    {"100000", false},
+
+		// Claude Code 默认配置
+		KeyClaudeCodeNumStartups:            {"0", false},
+		KeyClaudeCodeAutoUpdaterStatus:      {"enabled", false},
+		KeyClaudeCodeHasCompletedOnboarding: {"true", false},
+		KeyClaudeCodeLastOnboardingVersion:  {"1.0.17", false},
+		KeyClaudeCodeTelemetryEnabled:       {"true", false},
+		KeyClaudeCodeAnalyticsEnabled:       {"true", false},
+		KeyClaudeCodeCrashReportingEnabled:  {"true", false},
+
+		// Claude Code Router 默认配置
+		KeyRouterDefault:                  {"claude-3-5-sonnet-20241022", false},
+		KeyRouterBackground:               {"claude-3-5-haiku-20241022", false},
+		KeyRouterThink:                    {"claude-3-5-sonnet-20241022", false},
+		KeyRouterLongContext:              {"claude-3-5-sonnet-20241022", false},
+		KeyRouterWebSearch:                {"claude-3-5-sonnet-20241022", false},
+		KeyRouterLongContextThreshold:     {"60000", false},
+		KeyRouterEnableWebSearchDetection: {"true", false},
+		KeyRouterEnableToolUseDetection:   {"true", false},
+		KeyRouterEnableDynamicRouting:     {"true", false},
 	}
 
 	for key, defaultConfig := range defaults {

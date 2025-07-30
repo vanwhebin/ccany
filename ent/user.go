@@ -27,7 +27,7 @@ type User struct {
 	Salt string `json:"salt,omitempty"`
 	// User role: admin, user
 	Role string `json:"role,omitempty"`
-	// Whether active
+	// Whether activated
 	IsActive bool `json:"is_active,omitempty"`
 	// Last login time
 	LastLogin time.Time `json:"last_login,omitempty"`

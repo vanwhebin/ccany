@@ -68,6 +68,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultRole holds the default value on creation for the "role" field.
 	DefaultRole string
+	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	RoleValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
 	DefaultIsActive bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.

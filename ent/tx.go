@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// AppConfig is the client for interacting with the AppConfig builders.
 	AppConfig *AppConfigClient
+	// Channel is the client for interacting with the Channel builders.
+	Channel *ChannelClient
 	// RequestLog is the client for interacting with the RequestLog builders.
 	RequestLog *RequestLogClient
 	// User is the client for interacting with the User builders.
@@ -150,6 +152,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AppConfig = NewAppConfigClient(tx.config)
+	tx.Channel = NewChannelClient(tx.config)
 	tx.RequestLog = NewRequestLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 }

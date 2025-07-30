@@ -45,6 +45,73 @@ var (
 			},
 		},
 	}
+	// ChannelsColumns holds the columns for the "channels" table.
+	ChannelsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "base_url", Type: field.TypeString},
+		{Name: "api_key", Type: field.TypeString},
+		{Name: "custom_key", Type: field.TypeString, Unique: true},
+		{Name: "timeout", Type: field.TypeInt, Default: 30},
+		{Name: "max_retries", Type: field.TypeInt, Default: 3},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "weight", Type: field.TypeInt, Default: 1},
+		{Name: "priority", Type: field.TypeInt, Default: 1},
+		{Name: "models_mapping", Type: field.TypeJSON, Nullable: true},
+		{Name: "capabilities", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "request_count", Type: field.TypeInt64, Default: 0},
+		{Name: "error_count", Type: field.TypeInt64, Default: 0},
+		{Name: "success_rate", Type: field.TypeFloat64, Default: 1},
+		{Name: "total_tokens", Type: field.TypeInt64, Default: 0},
+		{Name: "avg_response_time", Type: field.TypeFloat64, Default: 0},
+	}
+	// ChannelsTable holds the schema information for the "channels" table.
+	ChannelsTable = &schema.Table{
+		Name:       "channels",
+		Columns:    ChannelsColumns,
+		PrimaryKey: []*schema.Column{ChannelsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "channel_custom_key",
+				Unique:  true,
+				Columns: []*schema.Column{ChannelsColumns[5]},
+			},
+			{
+				Name:    "channel_provider",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[2]},
+			},
+			{
+				Name:    "channel_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[8]},
+			},
+			{
+				Name:    "channel_priority",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[10]},
+			},
+			{
+				Name:    "channel_weight",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[9]},
+			},
+			{
+				Name:    "channel_success_rate",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[18]},
+			},
+			{
+				Name:    "channel_last_used_at",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelsColumns[15]},
+			},
+		},
+	}
 	// RequestLogsColumns holds the columns for the "request_logs" table.
 	RequestLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true},
@@ -130,6 +197,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AppConfigsTable,
+		ChannelsTable,
 		RequestLogsTable,
 		UsersTable,
 	}

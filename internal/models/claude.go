@@ -34,6 +34,36 @@ type ClaudeTool struct {
 	InputSchema map[string]interface{} `json:"input_schema"`
 }
 
+// ClaudeToolDefinition represents a comprehensive Claude tool definition
+type ClaudeToolDefinition struct {
+	Type        string                 `json:"type,omitempty"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Category    string                 `json:"category,omitempty"`
+	Version     string                 `json:"version,omitempty"`
+	InputSchema map[string]interface{} `json:"input_schema"`
+}
+
+// ClaudeToolInputSchema represents the input schema for a Claude tool
+type ClaudeToolInputSchema struct {
+	Type       string                        `json:"type"`
+	Properties map[string]ClaudeToolProperty `json:"properties,omitempty"`
+	Required   []string                      `json:"required,omitempty"`
+	Items      *ClaudeToolProperty           `json:"items,omitempty"`
+	OneOf      []ClaudeToolProperty          `json:"oneOf,omitempty"`
+}
+
+// ClaudeToolProperty represents a property in a Claude tool schema
+type ClaudeToolProperty struct {
+	Type        string                        `json:"type"`
+	Description string                        `json:"description,omitempty"`
+	Enum        []string                      `json:"enum,omitempty"`
+	Properties  map[string]ClaudeToolProperty `json:"properties,omitempty"`
+	Items       *ClaudeToolProperty           `json:"items,omitempty"`
+	Required    []string                      `json:"required,omitempty"`
+	Default     interface{}                   `json:"default,omitempty"`
+}
+
 // ClaudeTokenCountRequest represents a token count request
 type ClaudeTokenCountRequest struct {
 	Model    string          `json:"model"`

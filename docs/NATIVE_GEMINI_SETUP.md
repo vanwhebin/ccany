@@ -1,121 +1,176 @@
-# Native Gemini API Integration
+# Native Gemini API Support Setup Guide
 
-This document explains how to configure ccany to use Google's native Gemini API instead of the OpenAI-compatible endpoint.
+This guide explains how to configure ccany to use Google's native Gemini API instead of the OpenAI-compatible endpoint.
 
 ## Overview
 
-ccany now supports two ways to connect to Google's Gemini models:
+ccany now supports two ways to use Gemini models:
 
-1. **OpenAI-Compatible Endpoint** (Legacy) - Uses Gemini's OpenAI-compatible API
-2. **Native Gemini API** (Recommended) - Uses Google's native Gemini API directly
+1. **OpenAI-Compatible Endpoint** (existing): Uses Gemini's OpenAI-compatible API
+2. **Native Gemini API** (new): Uses Google's native Gemini API directly
 
-## Why Use Native Gemini API?
-
-The native Gemini API provides:
-- ✅ **Better Tool/Function Calling** - Proper support for Claude-style tools
-- ✅ **More Reliable** - Direct integration without compatibility layer issues
-- ✅ **Full Feature Support** - Access to all Gemini-specific capabilities
-- ✅ **Better Performance** - No conversion overhead
+The native API provides better performance, more accurate tool calling, and access to Gemini-specific features.
 
 ## Configuration
 
-### Automatic Detection
+### 1. Get Gemini API Key
 
-ccany automatically detects when you're using Gemini and routes requests through the native API when:
-- Base URL contains `generativelanguage.googleapis.com`
-- Model names contain `gemini`
+1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key
+3. Copy the key (starts with `AIza...`)
 
-### Recommended Configuration
+### 2. Configure ccany
 
-```bash
-# Set these in your ccany configuration:
-OPENAI_API_KEY=your_gemini_api_key_here
-OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-BIG_MODEL=gemini-2.5-flash
-SMALL_MODEL=gemini-1.5-flash
+#### Option A: Using Web Interface
+
+1. Open ccany setup page: `http://localhost:8082/setup`
+2. Add a new channel configuration:
+   - **Name**: `gemini-native`
+   - **Base URL**: `https://generativelanguage.googleapis.com/v1beta/models`
+   - **API Key**: Your Gemini API key
+   - **Model**: `gemini-1.5-flash` or `gemini-1.5-pro`
+
+#### Option B: Using Configuration File
+
+Add to your ccany configuration:
+
+```yaml
+channels:
+  gemini-native:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/models"
+    api_key: "AIza..."  # Your Gemini API key
+    models:
+      - "gemini-1.5-flash"
+      - "gemini-1.5-pro"
+      - "gemini-2.0-flash-exp"
 ```
 
-**Note:** Even though the base URL contains `/openai`, ccany will automatically convert this to the native endpoint `https://generativelanguage.googleapis.com/v1beta/models` for native API calls.
+## Usage
 
-### Supported Models
+### Claude Code Integration
 
-- `gemini-1.5-flash` - Fast, efficient model
-- `gemini-1.5-flash-latest` - Latest version of flash model
-- `gemini-1.5-pro` - More capable model
-- `gemini-1.5-pro-latest` - Latest version of pro model
-- `gemini-2.5-flash` - Latest generation flash model
+When using Claude Code, ccany will automatically detect Gemini endpoints and use the native API:
 
-## How It Works
+```python
+import anthropic
 
-1. **Request Detection** - ccany detects Gemini configuration
-2. **Native Conversion** - Converts Claude requests to native Gemini format
-3. **Direct API Call** - Sends request to Google's native API
-4. **Response Conversion** - Converts Gemini response back to Claude format
+client = anthropic.Anthropic(
+    api_key="your-ccany-key",
+    base_url="http://localhost:8082"
+)
 
-## Tool/Function Calling
+response = client.messages.create(
+    model="gemini-1.5-flash",
+    max_tokens=1000,
+    messages=[{"role": "user", "content": "Hello!"}],
+    tools=[
+        {
+            "name": "web_search",
+            "description": "Search the web",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"}
+                },
+                "required": ["query"]
+            }
+        }
+    ]
+)
+```
 
-The native integration properly handles:
-- ✅ Tool definitions with proper schema conversion
-- ✅ Tool choice modes (`auto`, `required`, `none`)
-- ✅ Function calls and responses
-- ✅ Mixed content (text + tool calls)
+### Direct API Usage
+
+```bash
+curl -X POST http://localhost:8082/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-ccany-key" \
+  -d '{
+    "model": "gemini-1.5-flash",
+    "max_tokens": 1000,
+    "messages": [
+      {"role": "user", "content": "What is the weather like?"}
+    ],
+    "tools": [
+      {
+        "name": "get_weather",
+        "description": "Get current weather",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "location": {"type": "string"}
+          },
+          "required": ["location"]
+        }
+      }
+    ]
+  }'
+```
+
+## Features
+
+### ✅ Supported Features
+
+- **All Claude Code tools**: web_search, file operations, bash commands, etc.
+- **Tool calling**: Full function calling support with proper schema conversion
+- **Streaming responses**: Real-time response streaming
+- **System prompts**: Converted to Gemini's SystemInstruction format
+- **Message history**: Full conversation context preservation
+- **Error handling**: Comprehensive error handling and logging
+
+### 🔄 Automatic Conversions
+
+ccany automatically handles:
+
+- **Schema sanitization**: Removes Gemini-incompatible schema properties
+- **Message format**: Converts Claude messages to Gemini Contents
+- **Tool definitions**: Transforms Claude tools to Gemini FunctionDeclarations
+- **Response format**: Converts Gemini responses back to Claude format
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **404 Errors** - Check that your API key is valid and has Gemini access
-2. **400 Schema Errors** - Ensure tool definitions follow Claude format
-3. **Authentication Errors** - Verify your Gemini API key is correct
+1. **"Invalid API key"**
+   - Verify your Gemini API key is correct
+   - Ensure the key has proper permissions
+
+2. **"Schema validation failed"**
+   - Check tool schema definitions
+   - ccany automatically sanitizes schemas, but complex nested schemas may need adjustment
+
+3. **"Model not found"**
+   - Verify the model name is correct
+   - Supported models: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.0-flash-exp`
 
 ### Debug Logging
 
-ccany provides detailed logging for native Gemini requests:
-```
-🔧 Detected Gemini backend - using Gemini converter
-🔧 Configured native Gemini API endpoint
-🔧 Converted Claude request to native Gemini format
-🔧 Sending request to native Gemini API
-🔧 Successfully processed request with native Gemini API
-```
-
-## Migration from OpenAI-Compatible
-
-If you're currently using the OpenAI-compatible endpoint:
-
-1. **No Configuration Changes Needed** - ccany automatically uses native API
-2. **Better Tool Support** - Tool calling will work more reliably
-3. **Same API Interface** - Your client code doesn't need to change
-
-## Testing
-
-Test your configuration with a tool calling request:
+Enable debug logging to see detailed request/response information:
 
 ```bash
-curl -X POST http://localhost:8082/v1/messages \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "claude-3-5-sonnet-20241022",
-    "max_tokens": 150,
-    "messages": [{"role": "user", "content": "What is the weather like?"}],
-    "tools": [{
-      "name": "get_weather",
-      "description": "Get weather for a location",
-      "input_schema": {
-        "type": "object",
-        "properties": {"location": {"type": "string"}},
-        "required": ["location"]
-      }
-    }],
-    "tool_choice": "auto"
-  }'
+LOG_LEVEL=debug ./ccany
 ```
 
-## Benefits Achieved
+Look for log entries containing:
+- `"Processing Claude Code compatible request"`
+- `"Detected Gemini provider"`
+- `"Converting Claude request to Gemini format"`
 
-With native Gemini integration, you get:
-- 🚀 **Reliable tool calling** without hanging or errors
-- 🎯 **Proper tool choice handling** (`auto`, `required`, `none`)
-- 📊 **Better error handling** with detailed Gemini-specific messages
-- ⚡ **Improved performance** with direct API communication
-- 🔧 **Full compatibility** with Claude API format
+## Performance Benefits
+
+Native Gemini API provides:
+
+- **Faster responses**: Direct API communication without OpenAI compatibility layer
+- **Better tool calling**: More accurate function calling with proper schema handling
+- **Lower latency**: Reduced request processing overhead
+- **Full feature access**: Access to all Gemini-specific capabilities
+
+## Migration from OpenAI-Compatible Endpoint
+
+To migrate existing Gemini configurations:
+
+1. **Update base URL**: Change from `/v1beta/openai/` to `/v1beta/models`
+2. **Keep API key**: Same Gemini API key works for both endpoints
+3. **Test thoroughly**: Verify tool calling and response formats work as expected
+
+The native API is backward compatible with existing Claude Code integrations.

@@ -28,8 +28,8 @@ func NewGeminiClient(apiKey, baseURL string, timeout int, logger *logrus.Logger)
 	// Convert OpenAI-compatible URL to native Gemini API URL
 	if strings.Contains(baseURL, "generativelanguage.googleapis.com") {
 		// Remove OpenAI-specific paths and construct native URL
-		baseURL = strings.Replace(baseURL, "/openai", "", -1)
-		baseURL = strings.Replace(baseURL, "/v1beta/openai", "/v1beta/models", -1)
+		baseURL = strings.ReplaceAll(baseURL, "/openai", "")
+		baseURL = strings.ReplaceAll(baseURL, "/v1beta/openai", "/v1beta/models")
 		baseURL = strings.TrimSuffix(baseURL, "/")
 
 		// Ensure it ends with /models for the native API
@@ -200,9 +200,9 @@ func (c *GeminiClient) ValidateAPIKey(ctx context.Context) error {
 }
 
 // GetModelInfo returns information about available Gemini models
-func (c *GeminiClient) GetModelInfo(ctx context.Context) (map[string]interface{}, error) {
+func (c *GeminiClient) GetModelInfo(ctx context.Context) (map[string]any, error) {
 	// This would typically call the models endpoint, but for now return static info
-	return map[string]interface{}{
+	return map[string]any{
 		"models": []string{
 			"gemini-1.5-flash",
 			"gemini-1.5-flash-latest",

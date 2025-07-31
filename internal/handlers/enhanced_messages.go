@@ -234,7 +234,7 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 			h.logger.WithField("request_id", requestID).Warn("Request context cancelled")
 			hasError = true
 			streamError = ctx.Err()
-			break
+			goto exitLoop
 		default:
 		}
 
@@ -256,6 +256,7 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 		}
 	}
 
+exitLoop:
 	// Update usage tokens
 	h.streamingService.UpdateUsageTokens(streamCtx, totalInputTokens, totalOutputTokens)
 

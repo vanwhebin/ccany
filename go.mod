@@ -7,7 +7,7 @@ toolchain go1.24.5
 require (
 	entgo.io/ent v0.14.4
 	github.com/gin-gonic/gin v1.10.1
-	github.com/golang-jwt/jwt/v5 v5.2.3
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/lib-x/entsqlite v0.1.3
 	github.com/nicksnyder/go-i18n/v2 v2.6.0

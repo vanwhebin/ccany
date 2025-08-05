@@ -9,6 +9,9 @@ import (
 // AppConfig is the predicate function for appconfig builders.
 type AppConfig func(*sql.Selector)
 
+// Channel is the predicate function for channel builders.
+type Channel func(*sql.Selector)
+
 // RequestLog is the predicate function for requestlog builders.
 type RequestLog func(*sql.Selector)
 

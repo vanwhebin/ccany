@@ -1,194 +1,217 @@
-# CCANY Test Suite
+# CCany 测试实现总结
 
-This directory contains comprehensive integration tests for the CCANY (Claude-to-OpenAI) proxy server.
+## 已创建的测试文件
 
-## Test Structure
+### 1. 综合测试脚本 (`ccany_comprehensive_test.py`)
+- **功能**：全面测试CCany的工具调用和API格式转换功能
+- **测试内容**：
+  - 健康检查
+  - Claude到OpenAI的API格式转换
+  - OpenAI到Claude的API格式转换  
+  - 基本工具调用（单工具）
+  - 复杂工具调用（多工具）
+  - 流式响应格式转换
+  - 多模态输入格式转换
+  - 错误处理和边界情况
+- **输出**：生成JSON格式的详细测试报告
 
-- `configuration_api_test.go` - Tests for configuration management API
-- `openai_sdk_integration_test.go` - Tests for OpenAI SDK integration and API compatibility
-- `run_tests.sh` - Automated test runner script
-- `.env.test.example` - Template for test environment variables
+### 2. Gemini专项测试 (`test_gemini_conversion.py`)
+- **功能**：专门测试Gemini API相关功能
+- **测试内容**：
+  - Gemini格式请求
+  - Gemini流式响应
+  - Gemini工具调用
+  - Gemini多模态输入
+  - Claude到Gemini的格式转换
 
-## Running Tests
+### 3. 快速测试脚本 (`quick_test.py`)
+- **功能**：快速验证服务器状态和基本功能
+- **测试内容**：
+  - 服务器健康检查
+  - 基本Claude格式请求
+  - 基本OpenAI格式请求
+  - 基本工具调用功能
 
-### Prerequisites
+### 4. 测试运行脚本 (`run_comprehensive_test.sh`)
+- **功能**：自动化运行测试的Shell脚本
+- **特性**：
+  - 检查Python环境
+  - 安装依赖
+  - 检查服务器状态
+  - 运行综合测试
 
-1. **Server Running**: The CCANY server must be running on `localhost:8082`
+### 5. 测试指南 (`TEST_GUIDE.md`)
+- **功能**：详细的测试使用说明
+- **内容**：
+  - 环境准备
+  - 服务器配置
+  - 测试运行方法
+  - 常见问题解决
+
+## 如何运行测试
+
+### 步骤1：启动CCany服务器
+
+```bash
+# 返回项目根目录
+cd /home/czyt/code/go/ccany
+
+# 启动服务器
+go run cmd/server/main.go
+
+# 或使用Docker
+docker-compose up -d
+```
+
+### 步骤2：配置API渠道
+
+1. 访问 http://localhost:8082
+2. 如果是首次运行，访问 http://localhost:8082/setup 创建管理员账户
+3. 登录后配置至少一个API渠道：
+   - **名称**：任意（如 "Test Channel"）
+   - **提供商**：选择 openai、claude 或 gemini
+   - **API密钥**：您的实际API密钥
+   - **自定义密钥**：`test-api-key`（与测试脚本中的一致）
+   - **基础URL**：根据提供商设置
+   - **启用**：是
+
+### 步骤3：运行测试
+
+#### 方法1：使用测试运行脚本（推荐）
+```bash
+cd tests
+chmod +x run_comprehensive_test.sh
+./run_comprehensive_test.sh
+```
+
+#### 方法2：运行快速测试
+```bash
+cd tests
+python3 quick_test.py test-api-key
+```
+
+#### 方法3：运行综合测试
+```bash
+cd tests
+python3 ccany_comprehensive_test.py test-api-key
+```
+
+#### 方法4：运行Gemini测试
+```bash
+cd tests
+python3 test_gemini_conversion.py test-api-key
+```
+
+## 测试功能验证清单
+
+### ✅ 已实现的测试功能
+
+1. **API格式转换测试**
+   - Claude → OpenAI 格式转换
+   - OpenAI → Claude 格式转换
+   - Gemini 相关格式转换
+
+2. **工具调用测试**
+   - 基本工具调用（单个工具）
+   - 复杂工具调用（多个工具）
+   - 工具参数验证
+   - 工具响应格式验证
+
+3. **流式响应测试**
+   - SSE事件流验证
+   - 流式内容拼接
+   - 事件序列验证
+
+4. **多模态输入测试**
+   - 图像输入处理
+   - 混合内容请求
+
+5. **错误处理测试**
+   - 无效JSON处理
+   - 缺少必填字段
+   - 无效API密钥
+   - 请求超时处理
+
+## 测试结果示例
+
+成功运行测试后，您将看到类似以下的输出：
+
+```
+🚀 开始运行CCany综合测试...
+============================================================
+
+🏥 检查服务器健康状态...
+✅ 服务器运行正常
+   状态: healthy
+   版本: 1.3.0
+
+🔄 测试 Claude → OpenAI 格式转换...
+✅ 成功 - Claude到OpenAI转换
+   格式转换成功
+
+🔄 测试 OpenAI → Claude 格式转换...
+✅ 成功 - OpenAI到Claude转换
+   格式转换成功
+
+🔧 测试基本工具调用...
+✅ 成功 - 基本工具调用
+   工具调用成功
+
+... (更多测试结果)
+
+============================================================
+📊 测试报告
+============================================================
+
+总测试数: 8
+✅ 通过: 7
+❌ 失败: 1
+成功率: 87.5%
+
+详细报告已保存到: test_report_20250730_131520.json
+```
+
+## 注意事项
+
+1. **API密钥配置**：确保在渠道配置中设置的自定义密钥与测试脚本中使用的密钥一致（默认为 `test-api-key`）
+
+2. **后端API密钥**：需要配置有效的OpenAI、Claude或Gemini API密钥，否则请求会失败
+
+3. **模型映射**：确保配置了正确的模型映射（大模型和小模型）
+
+4. **网络连接**：确保能够访问配置的API端点
+
+5. **日志查看**：如果测试失败，可以查看服务器日志获取更多信息：
    ```bash
-   # Start the server in one terminal
-   go run ./cmd/server
+   tail -f logs/app.log
    ```
 
-2. **Test Configuration** (optional): Copy and configure test environment variables
-   ```bash
-   # Copy the example file
-   cp tests/.env.test.example tests/.env.test
-   
-   # Edit with your test settings
-   nano tests/.env.test
-   ```
+## 故障排除
 
-### Quick Start
+### 问题1：服务器未运行
+- 确保执行了 `go run cmd/server/main.go`
+- 检查端口8082是否被占用
 
-Run all tests with the test runner script:
+### 问题2：认证失败
+- 检查API渠道配置
+- 确认自定义密钥设置正确
+- 验证后端API密钥有效
 
-```bash
-# Make script executable (first time only)
-chmod +x tests/run_tests.sh
+### 问题3：格式转换失败
+- 检查模型映射配置
+- 查看服务器日志了解详细错误
 
-# Run all tests
-./tests/run_tests.sh
-```
+### 问题4：工具调用失败
+- 确认使用的模型支持工具调用
+- 检查工具定义格式是否正确
 
-### Manual Test Execution
+## 总结
 
-#### Configuration Tests (No External Dependencies)
+这套测试脚本全面覆盖了CCany的主要功能，包括：
 
-These tests verify the configuration API functionality and don't require external API keys:
+1. **工具调用**：验证了工具定义的转换和执行
+2. **API格式转换**：测试了Claude、OpenAI和Gemini之间的格式转换
+3. **特殊功能**：流式响应、多模态输入等
+4. **错误处理**：各种异常情况的处理
 
-```bash
-go test -v ./tests -run TestConfigurationAPI
-```
-
-#### Integration Tests (Requires Test API Configuration)
-
-These tests require valid API credentials in your `.env.test` file:
-
-```bash
-# Set environment variables
-export TEST_API_KEY="your-test-api-key"
-export TEST_BASE_URL="https://api.example.com/v1"
-export TEST_MODEL="your-test-model"
-
-# Run integration tests
-go test -v ./tests -run TestOpenAISDKIntegration
-```
-
-#### All Tests
-
-```bash
-go test -v ./tests
-```
-
-## Test Configuration
-
-### Environment Variables
-
-Create `tests/.env.test` with your test configuration:
-
-```bash
-# Example for SiliconFlow API
-TEST_API_KEY=sk-your-test-api-key-here
-TEST_BASE_URL=https://api.siliconflow.cn/v1
-TEST_MODEL=deepseek-ai/DeepSeek-V3
-
-# Example for OpenAI API
-# TEST_API_KEY=sk-your-openai-test-key
-# TEST_BASE_URL=https://api.openai.com/v1
-# TEST_MODEL=gpt-3.5-turbo
-```
-
-### Security Notes
-
-- **Never commit real API keys** to version control
-- Use test API keys with limited quotas when possible
-- The `.env.test` file is ignored by git
-- Tests use placeholder values when real keys aren't available
-
-## Test Coverage
-
-### Configuration API Tests
-
-- ✅ Admin user setup and authentication
-- ✅ Configuration retrieval (GET /admin/config)
-- ✅ Configuration updates (PUT /admin/config)
-- ✅ Sensitive field masking
-- ✅ Partial configuration updates
-- ✅ Configuration persistence
-- ✅ Input validation
-
-### OpenAI SDK Integration Tests
-
-- ✅ OpenAI compatible API calls (POST /v1/chat/completions)
-- ✅ Streaming responses
-- ✅ Claude-to-OpenAI format conversion (POST /v1/messages)
-- ✅ Model routing (Claude model names → configured models)
-- ✅ Authentication with different header formats
-- ✅ Response format validation
-
-### What Gets Tested
-
-1. **API Compatibility**: Ensures the server correctly implements OpenAI-compatible endpoints
-2. **Format Conversion**: Verifies Claude API requests are properly converted to OpenAI format
-3. **Authentication**: Tests both OpenAI-style (`Authorization: Bearer`) and Claude-style (`x-api-key`) auth
-4. **Configuration Management**: Validates configuration persistence and security
-5. **Model Routing**: Confirms Claude model names are correctly mapped to configured models
-6. **Error Handling**: Tests graceful handling of invalid requests and configurations
-
-## Continuous Integration
-
-These tests are designed to be run in CI/CD environments:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run Integration Tests
-  env:
-    TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
-    TEST_BASE_URL: ${{ secrets.TEST_BASE_URL }}
-    TEST_MODEL: ${{ secrets.TEST_MODEL }}
-  run: |
-    go run ./cmd/server &
-    sleep 5
-    ./tests/run_tests.sh
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Server Not Running**: Ensure the server is started on port 8082
-2. **Test Failures**: Check that environment variables are set correctly
-3. **API Key Issues**: Verify test API keys are valid and have sufficient quota
-4. **Port Conflicts**: Make sure port 8082 is available
-
-### Test Debugging
-
-Run tests with verbose output to see detailed information:
-
-```bash
-go test -v ./tests -run TestName
-```
-
-Add custom logging in tests for debugging:
-
-```go
-t.Logf("Debug info: %v", someValue)
-```
-
-## Adding New Tests
-
-When adding new test cases:
-
-1. **Follow the naming pattern**: `Test*` functions for test cases
-2. **Use subtests**: Organize related tests with `t.Run()`
-3. **Clean up**: Ensure tests don't leave system in inconsistent state
-4. **Document**: Add clear descriptions of what each test verifies
-5. **Security**: Never hardcode sensitive information
-
-Example test structure:
-
-```go
-func TestNewFeature(t *testing.T) {
-    t.Run("Setup", func(t *testing.T) {
-        // Setup code
-    })
-    
-    t.Run("Test Case 1", func(t *testing.T) {
-        // Test implementation
-    })
-    
-    t.Run("Cleanup", func(t *testing.T) {
-        // Cleanup code
-    })
-}
-```
+通过运行这些测试，您可以验证CCany是否正确支持工具调用和多种API格式转换功能。

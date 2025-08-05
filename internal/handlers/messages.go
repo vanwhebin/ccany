@@ -478,37 +478,23 @@ func (h *MessagesHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	// Simple token estimation (4 characters per token)
-	totalChars := 0
+	// Use enhanced token counter from EnhancedMessagesHandler if available
+	enhancedHandler := NewEnhancedMessagesHandler(h.config, nil, h.openaiClient, h.requestLogger, h.logger)
 
-	// Count system message characters
-	if req.System != nil {
-		if systemStr, ok := req.System.(string); ok {
-			totalChars += len(systemStr)
-		}
+	// Convert to ClaudeMessagesRequest for token counting
+	claudeReq := &models.ClaudeMessagesRequest{
+		Model:    req.Model,
+		Messages: req.Messages,
+		System:   req.System,
 	}
 
-	// Count message characters
-	for _, msg := range req.Messages {
-		if msg.Content != nil {
-			if contentStr, ok := msg.Content.(string); ok {
-				totalChars += len(contentStr)
-			} else if contentBlocks, ok := msg.Content.([]interface{}); ok {
-				for _, block := range contentBlocks {
-					if blockMap, ok := block.(map[string]interface{}); ok {
-						if text, exists := blockMap["text"]; exists {
-							if textStr, ok := text.(string); ok {
-								totalChars += len(textStr)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	estimatedTokens := enhancedHandler.EstimateTokenCount(claudeReq)
 
-	// Rough estimation: 4 characters per token
-	estimatedTokens := max(1, totalChars/4)
+	h.logger.WithFields(logrus.Fields{
+		"model":            req.Model,
+		"estimated_tokens": estimatedTokens,
+		"message_count":    len(req.Messages),
+	}).Info("Token count estimation completed")
 
 	c.JSON(http.StatusOK, gin.H{
 		"input_tokens": estimatedTokens,
@@ -774,14 +760,6 @@ exitOpenAILoop:
 			}
 		}()
 	}
-}
-
-// max returns the maximum of two integers
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // generateSessionID generates a session ID based on project path and user ID

@@ -1,0 +1,12 @@
+{
+  "numStartups": 2,
+  "autoUpdaterStatus": "",
+  "userID": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab",
+  "hasCompletedOnboarding": false,
+  "lastOnboardingVersion": "",
+  "projects": null,
+  "installationID": "abcdefghijklmnopqrstuvwxyzABCDEF",
+  "telemetryEnabled": false,
+  "analyticsEnabled": false,
+  "crashReportingEnabled": false
+}

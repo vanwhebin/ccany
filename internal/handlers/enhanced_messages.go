@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"ccany/internal/app"
@@ -14,6 +15,7 @@ import (
 	"ccany/internal/converter"
 	"ccany/internal/logging"
 	"ccany/internal/models"
+	"ccany/internal/tokenizer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,27 +24,31 @@ import (
 
 // EnhancedMessagesHandler handles Claude messages API requests with Claude Code compatibility
 type EnhancedMessagesHandler struct {
-	config           *config.Config
-	configManager    *app.ConfigManager
-	openaiClient     *client.OpenAIClient
-	requestLogger    *logging.RequestLogger
-	logger           *logrus.Logger
-	streamingService *claudecode.StreamingService
-	modelRouter      *claudecode.ModelRouter
-	configService    *claudecode.ConfigService
+	config             *config.Config
+	configManager      *app.ConfigManager
+	openaiClient       *client.OpenAIClient
+	requestLogger      *logging.RequestLogger
+	logger             *logrus.Logger
+	streamingService   *claudecode.StreamingService
+	modelRouter        *claudecode.ModelRouter
+	configService      *claudecode.ConfigService
+	tokenCounter       *tokenizer.TokenCounter
+	reasoningProcessor *claudecode.ReasoningProcessor
 }
 
 // NewEnhancedMessagesHandler creates a new enhanced messages handler
 func NewEnhancedMessagesHandler(cfg *config.Config, configManager *app.ConfigManager, openaiClient *client.OpenAIClient, requestLogger *logging.RequestLogger, logger *logrus.Logger) *EnhancedMessagesHandler {
 	return &EnhancedMessagesHandler{
-		config:           cfg,
-		configManager:    configManager,
-		openaiClient:     openaiClient,
-		requestLogger:    requestLogger,
-		logger:           logger,
-		streamingService: claudecode.NewStreamingService(logger),
-		modelRouter:      claudecode.NewModelRouter(logger, cfg.BigModel, cfg.SmallModel),
-		configService:    claudecode.NewConfigService(logger),
+		config:             cfg,
+		configManager:      configManager,
+		openaiClient:       openaiClient,
+		requestLogger:      requestLogger,
+		logger:             logger,
+		streamingService:   claudecode.NewStreamingService(logger),
+		modelRouter:        claudecode.NewModelRouter(logger, cfg.BigModel, cfg.SmallModel),
+		configService:      claudecode.NewConfigService(logger, configManager.GetConfigService(), context.Background()),
+		tokenCounter:       tokenizer.NewTokenCounter(logger),
+		reasoningProcessor: claudecode.NewReasoningProcessor(logger),
 	}
 }
 
@@ -141,6 +147,17 @@ func (h *EnhancedMessagesHandler) CreateMessage(c *gin.Context) {
 		claudeReq.Model = routedModel
 	}
 
+	// Check if we should route to native Gemini API
+	if h.isGeminiEndpoint(cfg.OpenAIBaseURL) {
+		h.logger.WithFields(logrus.Fields{
+			"request_id": requestID,
+			"base_url":   cfg.OpenAIBaseURL,
+		}).Info("Routing to native Gemini API")
+
+		h.handleGeminiRequest(c, requestID, &claudeReq, cfg)
+		return
+	}
+
 	// Convert Claude request to OpenAI format
 	openaiReq, err := converter.ConvertClaudeToOpenAI(&claudeReq, cfg.BigModel, cfg.SmallModel)
 	if err != nil {
@@ -165,6 +182,12 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 
 	// Initialize Claude Code compatible streaming
 	streamCtx := h.streamingService.InitializeStreaming(c, requestID, claudeReq.Model)
+
+	// Initialize reasoning/thinking support if enabled
+	var reasoningCtx *claudecode.ReasoningContext
+	if claudeReq.Thinking {
+		reasoningCtx = h.reasoningProcessor.InitializeThinkingBlock(c, streamCtx, true)
+	}
 
 	// Check for client disconnect before starting stream
 	if h.streamingService.CheckClientDisconnect(c) {
@@ -211,7 +234,7 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 			h.logger.WithField("request_id", requestID).Warn("Request context cancelled")
 			hasError = true
 			streamError = ctx.Err()
-			break
+			goto exitLoop
 		default:
 		}
 
@@ -228,11 +251,12 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 		}
 
 		if chunk.Data != nil {
-			// Process chunk data with Claude Code events
-			h.processStreamChunk(c, streamCtx, chunk.Data, &totalInputTokens, &totalOutputTokens)
+			// Process chunk data with Claude Code events and reasoning support
+			h.processStreamChunk(c, streamCtx, chunk.Data, &totalInputTokens, &totalOutputTokens, reasoningCtx)
 		}
 	}
 
+exitLoop:
 	// Update usage tokens
 	h.streamingService.UpdateUsageTokens(streamCtx, totalInputTokens, totalOutputTokens)
 
@@ -240,6 +264,11 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 	stopReason := "end_turn"
 	if hasError {
 		stopReason = "error"
+	}
+
+	// Finalize reasoning block if enabled
+	if reasoningCtx != nil {
+		h.reasoningProcessor.FinalizeThinkingBlock(c, reasoningCtx)
 	}
 
 	// Finalize streaming with proper Claude Code events
@@ -261,12 +290,26 @@ func (h *EnhancedMessagesHandler) handleClaudeCodeStreamingRequest(c *gin.Contex
 }
 
 // processStreamChunk processes individual stream chunks and converts them to Claude Code events
-func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *claudecode.StreamingContext, data interface{}, inputTokens, outputTokens *int) {
+func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *claudecode.StreamingContext, data interface{}, inputTokens, outputTokens *int, reasoningCtx *claudecode.ReasoningContext) {
 	// Handle OpenAIStreamResponse type
 	if streamResp, ok := data.(*models.OpenAIStreamResponse); ok {
 		// Handle choices
 		if len(streamResp.Choices) > 0 {
 			choice := streamResp.Choices[0]
+
+			// Process reasoning content if present
+			if reasoningCtx != nil {
+				deltaMap := map[string]interface{}{
+					"content": choice.Delta.Content,
+				}
+				// Check for reasoning content in delta
+				if h.reasoningProcessor.ProcessReasoningDelta(c, streamCtx, reasoningCtx, deltaMap) {
+					// Reasoning was processed, skip regular content processing if no other content
+					if choice.Delta.Content == "" && len(choice.Delta.ToolCalls) == 0 {
+						return
+					}
+				}
+			}
 
 			// Handle delta content
 			if choice.Delta.Content != "" {
@@ -319,6 +362,13 @@ func (h *EnhancedMessagesHandler) processStreamChunk(c *gin.Context, streamCtx *
 					// Handle delta content
 					if delta, exists := choice["delta"]; exists {
 						if deltaMap, ok := delta.(map[string]interface{}); ok {
+							// Process reasoning content if present
+							if reasoningCtx != nil {
+								if h.reasoningProcessor.ProcessReasoningDelta(c, streamCtx, reasoningCtx, deltaMap) {
+									// Reasoning was processed, check for other content
+								}
+							}
+
 							// Handle text content
 							if content, exists := deltaMap["content"]; exists {
 								if contentStr, ok := content.(string); ok {
@@ -835,4 +885,55 @@ func (h *EnhancedMessagesHandler) TestOpenAIModel(c *gin.Context) {
 		"response_id":   openaiResp.ID,
 		"response_text": openaiResp.Choices[0].Message.Content,
 	})
+}
+
+// isGeminiEndpoint checks if the base URL is a Gemini endpoint
+func (h *EnhancedMessagesHandler) isGeminiEndpoint(baseURL string) bool {
+	return strings.Contains(baseURL, "generativelanguage.googleapis.com")
+}
+
+// handleGeminiRequest handles requests routed to native Gemini API
+func (h *EnhancedMessagesHandler) handleGeminiRequest(c *gin.Context, requestID string, claudeReq *models.ClaudeMessagesRequest, cfg *config.Config) {
+	// Create Gemini client
+	geminiClient := client.NewGeminiClient(cfg.OpenAIAPIKey, cfg.OpenAIBaseURL, cfg.RequestTimeout, h.logger)
+
+	// Convert Claude request to Gemini format
+	geminiConverter := converter.NewGeminiConverter()
+	geminiReq, err := geminiConverter.ConvertFromClaude(claudeReq)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to convert Claude request to Gemini format")
+		c.JSON(http.StatusBadRequest, converter.CreateClaudeErrorResponse("invalid_request_error", "Failed to convert request to Gemini format"))
+		return
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(cfg.RequestTimeout)*time.Second)
+	defer cancel()
+
+	// Make request to Gemini API
+	geminiResp, err := geminiClient.CreateChatCompletion(ctx, claudeReq.Model, geminiReq)
+	if err != nil {
+		h.logger.WithError(err).Error("Gemini API request failed")
+		c.JSON(http.StatusBadGateway, converter.CreateClaudeErrorResponse("api_error", fmt.Sprintf("Gemini API error: %v", err)))
+		return
+	}
+
+	// Convert Gemini response back to Claude format
+	claudeResp, err := geminiConverter.ConvertToClaude(geminiResp, claudeReq)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to convert Gemini response to Claude format")
+		c.JSON(http.StatusInternalServerError, converter.CreateClaudeErrorResponse("internal_error", "Failed to convert response"))
+		return
+	}
+
+	// Log successful response
+	h.logger.WithFields(logrus.Fields{
+		"request_id":    requestID,
+		"model":         claudeReq.Model,
+		"input_tokens":  claudeResp.Usage.InputTokens,
+		"output_tokens": claudeResp.Usage.OutputTokens,
+	}).Info("Gemini request completed successfully")
+
+	// Return Claude-compatible response
+	c.JSON(http.StatusOK, claudeResp)
 }

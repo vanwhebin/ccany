@@ -4,6 +4,7 @@ package ent
 
 import (
 	"ccany/ent/appconfig"
+	"ccany/ent/channel"
 	"ccany/ent/requestlog"
 	"ccany/ent/schema"
 	"ccany/ent/user"
@@ -42,6 +43,58 @@ func init() {
 	appconfig.DefaultUpdatedAt = appconfigDescUpdatedAt.Default.(func() time.Time)
 	// appconfig.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	appconfig.UpdateDefaultUpdatedAt = appconfigDescUpdatedAt.UpdateDefault.(func() time.Time)
+	channelFields := schema.Channel{}.Fields()
+	_ = channelFields
+	// channelDescTimeout is the schema descriptor for timeout field.
+	channelDescTimeout := channelFields[6].Descriptor()
+	// channel.DefaultTimeout holds the default value on creation for the timeout field.
+	channel.DefaultTimeout = channelDescTimeout.Default.(int)
+	// channelDescMaxRetries is the schema descriptor for max_retries field.
+	channelDescMaxRetries := channelFields[7].Descriptor()
+	// channel.DefaultMaxRetries holds the default value on creation for the max_retries field.
+	channel.DefaultMaxRetries = channelDescMaxRetries.Default.(int)
+	// channelDescEnabled is the schema descriptor for enabled field.
+	channelDescEnabled := channelFields[8].Descriptor()
+	// channel.DefaultEnabled holds the default value on creation for the enabled field.
+	channel.DefaultEnabled = channelDescEnabled.Default.(bool)
+	// channelDescWeight is the schema descriptor for weight field.
+	channelDescWeight := channelFields[9].Descriptor()
+	// channel.DefaultWeight holds the default value on creation for the weight field.
+	channel.DefaultWeight = channelDescWeight.Default.(int)
+	// channelDescPriority is the schema descriptor for priority field.
+	channelDescPriority := channelFields[10].Descriptor()
+	// channel.DefaultPriority holds the default value on creation for the priority field.
+	channel.DefaultPriority = channelDescPriority.Default.(int)
+	// channelDescCreatedAt is the schema descriptor for created_at field.
+	channelDescCreatedAt := channelFields[13].Descriptor()
+	// channel.DefaultCreatedAt holds the default value on creation for the created_at field.
+	channel.DefaultCreatedAt = channelDescCreatedAt.Default.(func() time.Time)
+	// channelDescUpdatedAt is the schema descriptor for updated_at field.
+	channelDescUpdatedAt := channelFields[14].Descriptor()
+	// channel.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	channel.DefaultUpdatedAt = channelDescUpdatedAt.Default.(func() time.Time)
+	// channel.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	channel.UpdateDefaultUpdatedAt = channelDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// channelDescRequestCount is the schema descriptor for request_count field.
+	channelDescRequestCount := channelFields[16].Descriptor()
+	// channel.DefaultRequestCount holds the default value on creation for the request_count field.
+	channel.DefaultRequestCount = channelDescRequestCount.Default.(int64)
+	// channelDescErrorCount is the schema descriptor for error_count field.
+	channelDescErrorCount := channelFields[17].Descriptor()
+	// channel.DefaultErrorCount holds the default value on creation for the error_count field.
+	channel.DefaultErrorCount = channelDescErrorCount.Default.(int64)
+	// channelDescSuccessRate is the schema descriptor for success_rate field.
+	channelDescSuccessRate := channelFields[18].Descriptor()
+	// channel.DefaultSuccessRate holds the default value on creation for the success_rate field.
+	channel.DefaultSuccessRate = channelDescSuccessRate.Default.(float64)
+	// channelDescTotalTokens is the schema descriptor for total_tokens field.
+	channelDescTotalTokens := channelFields[19].Descriptor()
+	// channel.DefaultTotalTokens holds the default value on creation for the total_tokens field.
+	channel.DefaultTotalTokens = channelDescTotalTokens.Default.(int64)
+	// channelDescAvgResponseTime is the schema descriptor for avg_response_time field.
+	channelDescAvgResponseTime := channelFields[20].Descriptor()
+	// channel.DefaultAvgResponseTime holds the default value on creation for the avg_response_time field.
+	channel.DefaultAvgResponseTime = channelDescAvgResponseTime.Default.(float64)
 	requestlogFields := schema.RequestLog{}.Fields()
 	_ = requestlogFields
 	// requestlogDescStatusCode is the schema descriptor for status_code field.
@@ -80,6 +133,8 @@ func init() {
 	userDescRole := userFields[5].Descriptor()
 	// user.DefaultRole holds the default value on creation for the role field.
 	user.DefaultRole = userDescRole.Default.(string)
+	// user.RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	user.RoleValidator = userDescRole.Validators[0].(func(string) error)
 	// userDescIsActive is the schema descriptor for is_active field.
 	userDescIsActive := userFields[6].Descriptor()
 	// user.DefaultIsActive holds the default value on creation for the is_active field.

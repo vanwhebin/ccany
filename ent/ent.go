@@ -4,6 +4,7 @@ package ent
 
 import (
 	"ccany/ent/appconfig"
+	"ccany/ent/channel"
 	"ccany/ent/requestlog"
 	"ccany/ent/user"
 	"context"
@@ -76,6 +77,7 @@ func checkColumn(table, column string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			appconfig.Table:  appconfig.ValidColumn,
+			channel.Table:    channel.ValidColumn,
 			requestlog.Table: requestlog.ValidColumn,
 			user.Table:       user.ValidColumn,
 		})

@@ -19,7 +19,7 @@ require (
 	github.com/tiktoken-go/tokenizer v0.6.2
 	golang.org/x/crypto v0.40.0
 	golang.org/x/net v0.42.0
-	golang.org/x/text v0.27.0
+	golang.org/x/text v0.28.0
 )
 
 require (
@@ -64,7 +64,7 @@ require (
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
-	golang.org/x/mod v0.25.0 // indirect
+	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
